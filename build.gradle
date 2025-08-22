@@ -1,0 +1,24 @@
+plugins {
+    id 'java'
+}
+
+group = 'org.football'
+version = '0.1-beta'
+
+repositories {
+    mavenCentral()
+    maven { url = "https://repo.papermc.io/repository/maven-public/" }
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT"
+
+    // Adventure (IDE-шный хелп, версии подтягиваются из BOM)
+    compileOnly platform("net.kyori:adventure-bom:4.24.0")
+    compileOnly "net.kyori:adventure-api"
+    compileOnly "net.kyori:adventure-text-serializer-plain"
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
