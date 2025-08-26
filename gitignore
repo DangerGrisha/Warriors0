@@ -1,0 +1,18 @@
+# Build output
+build/
+out/
+
+# Gradle cache
+.gradle/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Java
+*.class
+
+# OS junk
+.DS_Store
+Thumbs.db

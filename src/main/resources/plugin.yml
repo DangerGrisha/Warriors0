@@ -5,10 +5,11 @@ api-version: 1.21
 
 commands:
   kitgive:
-    description: Give kit items for heroes (Ganyu, HuTao)
+    description: Give kit items for heroes (Ganyu, HuTao, DIO)
     usage: |
       /kitgive Ganyu <bow|bud|ult> [player]
       /kitgive HuTao <homa|pyro> [player]
+      /kitgive DIO <hand|timestop|vampire> [player]
     aliases: [kg]
     permission: kits.give
 
