@@ -277,17 +277,4 @@ public final class LevitationMarkListener implements Listener {
         armed.remove(e.getPlayer().getUniqueId());
         // метки сами истекают по времени; можно подчистить: marked.remove(id) — но оставим, чтобы другой игрок всё ещё был помечен
     }
-
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
-    public void onJoin(PlayerJoinEvent e) {
-        // если игрок вернулся, а кд уже прошёл — вернуть предмет
-        Player p = e.getPlayer();
-        long until = cooldownUntilMs.getOrDefault(p.getUniqueId(), 0L);
-        if (System.currentTimeMillis() >= until && !playerHas(p)) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                giveToHandOrInv(p, makeLevitationMarkDye());
-                p.playSound(p.getLocation(), Sound.UI_TOAST_IN, 0.7f, 1.2f);
-            });
-        }
-    }
 }

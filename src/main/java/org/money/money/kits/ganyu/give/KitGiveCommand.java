@@ -10,13 +10,18 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
-import org.money.money.kits.dio.TimeStopListener;      // NEW
-import org.money.money.kits.dio.VampireListener;      // NEW
+import org.money.money.kits.burgerMaster.GrillPlaceListener;
+import org.money.money.kits.burgerMaster.GardenPlatformListener;      // NEW
+import org.money.money.kits.dio.TimeStopListener;
+import org.money.money.kits.dio.VampireListener;
 import org.money.money.kits.ganyu.listeners.GanyuBudListener;
 import org.money.money.kits.ganyu.listeners.GanyuUltListener;
 import org.money.money.kits.hutao.HuTaoInvisListener;
 import org.money.money.kits.hutao.HuTaoPyroListener;
 import org.money.money.kits.hutao.HuTaoBoomListener;
+import org.money.money.kits.naruto.DisappearanceTechniqueListener;
+import org.money.money.kits.naruto.NarutoRasenganListener;
+import org.money.money.kits.naruto.NarutoClonesListener;
 import org.money.money.kits.uraraka.LevitationMarkListener;
 import org.money.money.kits.uraraka.UrarakaGloveListener;
 import org.money.money.kits.uraraka.UrarakaGravityListener;
@@ -33,12 +38,17 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     private final HuTaoInvisListener huTaoInvisListener;
     private final HuTaoPyroListener huTaoPyroListener;
     private final HuTaoBoomListener huTaoBoomListener;
-    private final TimeStopListener  timeStopListener;            // NEW
-    private final VampireListener   vampireListener;             // NEW
-    private final UrarakaGloveListener   urarakaGloveListener;   // NEW
-    private final UrarakaGravityListener urarakaGravityListener; // NEW
-    private final UrarakaHealPostListener urarakaHealPostListener; // NEW
-    private final LevitationMarkListener levitationMarkListener;   // <-- NEW
+    private final TimeStopListener  timeStopListener;
+    private final VampireListener   vampireListener;
+    private final UrarakaGloveListener   urarakaGloveListener;
+    private final UrarakaGravityListener urarakaGravityListener;
+    private final UrarakaHealPostListener urarakaHealPostListener;
+    private final LevitationMarkListener levitationMarkListener;
+    private final NarutoRasenganListener narutoRasenganListener;
+    private final DisappearanceTechniqueListener disappearListener;
+    private final NarutoClonesListener narutoClonesListener;
+    private final GrillPlaceListener grillPlacer;                     // BurgerMaster: grill
+    private final GardenPlatformListener gardenPlatform;              // BurgerMaster: garden  NEW
 
     private final NamespacedKey KEY_GANYU_BOW;
     private final NamespacedKey KEY_DIO_HAND;
@@ -54,7 +64,12 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                           UrarakaGloveListener urarakaGloveListener,
                           UrarakaGravityListener urarakaGravityListener,
                           UrarakaHealPostListener urarakaHealPostListener,
-                          LevitationMarkListener levitationMarkListener) { // <-- NEW
+                          LevitationMarkListener levitationMarkListener,
+                          NarutoRasenganListener narutoRasenganListener,
+                          DisappearanceTechniqueListener disappearListener,
+                          NarutoClonesListener narutoClonesListener,
+                          GrillPlaceListener grillPlacer,
+                          GardenPlatformListener gardenPlatform) {                 // NEW
 
         this.plugin = Objects.requireNonNull(plugin);
         this.budListener = Objects.requireNonNull(budListener);
@@ -67,7 +82,12 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.urarakaGloveListener = Objects.requireNonNull(urarakaGloveListener);
         this.urarakaGravityListener = Objects.requireNonNull(urarakaGravityListener);
         this.urarakaHealPostListener = Objects.requireNonNull(urarakaHealPostListener);
-        this.levitationMarkListener  = Objects.requireNonNull(levitationMarkListener); // <-- NEW
+        this.levitationMarkListener  = Objects.requireNonNull(levitationMarkListener);
+        this.narutoRasenganListener  = Objects.requireNonNull(narutoRasenganListener);
+        this.disappearListener       = Objects.requireNonNull(disappearListener);
+        this.narutoClonesListener    = Objects.requireNonNull(narutoClonesListener);
+        this.grillPlacer             = Objects.requireNonNull(grillPlacer);
+        this.gardenPlatform          = Objects.requireNonNull(gardenPlatform);     // NEW
 
         this.KEY_GANYU_BOW = new NamespacedKey(plugin, "ganyu_bow");
         this.KEY_DIO_HAND  = new NamespacedKey(plugin, "dio_hand");
@@ -84,7 +104,9 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Ganyu <bow|bud|ult> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " HuTao <homa|pyro|ult> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Dio <hand|timestop|vampire> [player]");
-            sender.sendMessage(ChatColor.GRAY + " /" + label + " Uraraka <glove|gravity|healpost|levmark> [player]"); // <-- NEW
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " Uraraka <glove|gravity|healpost|levmark> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " Naruto <rasengan|disappear|clones> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden> [player]"); // UPDATED
             return true;
         }
 
@@ -140,20 +162,26 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             }
             case "uraraka", "ochaco" -> {
                 switch (sub) {
-                    case "glove" -> {
-                        itemToGive = urarakaGloveListener.makeGloveSword();          pretty = "Glove";
-                    }
-                    case "gravity" -> {
-                        itemToGive = urarakaGravityListener.makeGravityDye();        pretty = "gravity";
-                    }
-                    case "healpost", "heal", "post" -> {
-                        itemToGive = urarakaHealPostListener.makeHealPostItem();     pretty = "Heal Post";
-                    }
-                    case "levmark", "levitationmark", "lev" -> {                      // <-- NEW
-                        itemToGive = levitationMarkListener.makeLevitationMarkDye();
-                        pretty = "Levitation Mark";
-                    }
+                    case "glove" -> { itemToGive = urarakaGloveListener.makeGloveSword(); pretty = "Glove"; }
+                    case "gravity" -> { itemToGive = urarakaGravityListener.makeGravityDye(); pretty = "gravity"; }
+                    case "healpost", "heal", "post" -> { itemToGive = urarakaHealPostListener.makeHealPostItem(); pretty = "Heal Post"; }
+                    case "levmark", "levitationmark", "lev" -> { itemToGive = levitationMarkListener.makeLevitationMarkDye(); pretty = "Levitation Mark"; }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Uraraka: " + sub); return true; }
+                }
+            }
+            case "naruto" -> {
+                switch (sub) {
+                    case "rasengan" -> { itemToGive = narutoRasenganListener.makeRasenganDye(); pretty = "Rasengan"; }
+                    case "disappear", "vanish", "teleport" -> { itemToGive = disappearListener.makeDisappearanceDye(); pretty = "Disappearance Technique"; }
+                    case "clones", "clone", "shadowclones" -> { itemToGive = narutoClonesListener.makeClonesDye(); pretty = "Clones"; }
+                    default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Naruto: " + sub); return true; }
+                }
+            }
+            case "burgermaster", "burger" -> {                               // UPDATED
+                switch (sub) {
+                    case "grill"   -> { itemToGive = grillPlacer.makeGrillBlock();              pretty = "grill"; }
+                    case "garden"  -> { itemToGive = gardenPlatform.makeGardenPlatformBlock();  pretty = "Garden Platform"; }
+                    default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для BurgerMaster: " + sub); return true; }
                 }
             }
             default -> { sender.sendMessage(ChatColor.RED + "Неизвестный герой: " + args[0]); return true; }
@@ -210,12 +238,15 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (!sender.hasPermission("kits.give")) return List.of();
 
-        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka"), args[0]);
+        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster"), args[0]);
         if (args.length == 2) {
             if ("ganyu".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("bow","bud","ult"), args[1]);
             if ("hutao".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("homa","pyro","ult"), args[1]);
             if ("dio".equalsIgnoreCase(args[0]))     return filter(Arrays.asList("hand","timestop","vampire"), args[1]);
-            if ("uraraka".equalsIgnoreCase(args[0])) return filter(Arrays.asList("glove","gravity","healpost","levmark"), args[1]); // <-- NEW
+            if ("uraraka".equalsIgnoreCase(args[0])) return filter(Arrays.asList("glove","gravity","healpost","levmark"), args[1]);
+            if ("naruto".equalsIgnoreCase(args[0]))  return filter(Arrays.asList("rasengan","disappear","clones"), args[1]);
+            if ("burgermaster".equalsIgnoreCase(args[0]) || "burger".equalsIgnoreCase(args[0]))
+                return filter(Arrays.asList("grill","garden"), args[1]); // UPDATED
         }
         if (args.length == 3) {
             List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();

@@ -347,17 +347,4 @@ public final class UrarakaGravityListener implements Listener {
         finishAndCooldown(e.getEntity().getUniqueId(), FinishReason.CANCELLED);
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
-    public void onJoin(PlayerJoinEvent e) {
-        // если игрок пришёл уже после истечения кд и предмета нет — вернуть сразу
-        Player p = e.getPlayer();
-        long until = cooldownUntilMs.getOrDefault(p.getUniqueId(), 0L);
-        if (System.currentTimeMillis() >= until && !playerHas(p, KEY_GRAVITY)) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                giveToHandOrInv(p, makeGravityDye());
-                p.playSound(p.getLocation(), Sound.UI_TOAST_IN, 0.7f, 1.2f);
-                p.sendMessage(Component.text("Gravity восстановлена.", NamedTextColor.GREEN));
-            });
-        }
-    }
 }
