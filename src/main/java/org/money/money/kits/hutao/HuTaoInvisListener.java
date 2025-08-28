@@ -167,7 +167,7 @@ public final class HuTaoInvisListener implements Listener {
     private ItemStack makeRemoveItem() {
         ItemStack it = new ItemStack(Material.RED_DYE);
         ItemMeta im = it.getItemMeta();
-        im.displayName(Component.text("§cRemove Invis"));
+        im.displayName(Component.text("Remove Invis"));
         im.getPersistentDataContainer().set(KEY_REMOVE, PersistentDataType.BYTE, (byte) 1);
         im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         it.setItemMeta(im);

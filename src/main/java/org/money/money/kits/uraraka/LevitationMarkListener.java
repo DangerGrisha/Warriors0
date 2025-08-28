@@ -55,7 +55,7 @@ public final class LevitationMarkListener implements Listener {
     /* ======================= Item ======================= */
 
     public ItemStack makeLevitationMarkDye() {
-        ItemStack it = new ItemStack(Material.RED_DYE);
+        ItemStack it = new ItemStack(Material.NETHER_STAR);
         ItemMeta im = it.getItemMeta();
         im.displayName(Component.text("Levitation Mark"));
         im.getPersistentDataContainer().set(KEY_ITEM, PersistentDataType.BYTE, (byte)1);
@@ -88,7 +88,7 @@ public final class LevitationMarkListener implements Listener {
     }
 
     private boolean isMarkItem(ItemStack it) {
-        if (it == null || it.getType() != Material.RED_DYE || !it.hasItemMeta()) return false;
+        if (it == null || it.getType() != Material.NETHER_STAR || !it.hasItemMeta()) return false;
         var im = it.getItemMeta();
         if (im.getPersistentDataContainer().has(KEY_ITEM, PersistentDataType.BYTE)) return true;
         return Component.text("Levitation Mark").equals(im.displayName());

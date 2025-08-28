@@ -11,7 +11,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import org.money.money.kits.burgerMaster.GrillPlaceListener;
-import org.money.money.kits.burgerMaster.GardenPlatformListener;      // NEW
+import org.money.money.kits.burgerMaster.GardenPlatformListener;
+import org.money.money.kits.burgerMaster.HungryMasterListener;      // <<< NEW
 import org.money.money.kits.dio.TimeStopListener;
 import org.money.money.kits.dio.VampireListener;
 import org.money.money.kits.ganyu.listeners.GanyuBudListener;
@@ -48,7 +49,8 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     private final DisappearanceTechniqueListener disappearListener;
     private final NarutoClonesListener narutoClonesListener;
     private final GrillPlaceListener grillPlacer;                     // BurgerMaster: grill
-    private final GardenPlatformListener gardenPlatform;              // BurgerMaster: garden  NEW
+    private final GardenPlatformListener gardenPlatform;              // BurgerMaster: garden
+    private final HungryMasterListener hungryMasterListener;          // BurgerMaster: hungry  <<< NEW
 
     private final NamespacedKey KEY_GANYU_BOW;
     private final NamespacedKey KEY_DIO_HAND;
@@ -69,7 +71,8 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                           DisappearanceTechniqueListener disappearListener,
                           NarutoClonesListener narutoClonesListener,
                           GrillPlaceListener grillPlacer,
-                          GardenPlatformListener gardenPlatform) {                 // NEW
+                          GardenPlatformListener gardenPlatform,
+                          HungryMasterListener hungryMasterListener) {              // <<< NEW
 
         this.plugin = Objects.requireNonNull(plugin);
         this.budListener = Objects.requireNonNull(budListener);
@@ -87,7 +90,8 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.disappearListener       = Objects.requireNonNull(disappearListener);
         this.narutoClonesListener    = Objects.requireNonNull(narutoClonesListener);
         this.grillPlacer             = Objects.requireNonNull(grillPlacer);
-        this.gardenPlatform          = Objects.requireNonNull(gardenPlatform);     // NEW
+        this.gardenPlatform          = Objects.requireNonNull(gardenPlatform);
+        this.hungryMasterListener    = Objects.requireNonNull(hungryMasterListener); // <<< NEW
 
         this.KEY_GANYU_BOW = new NamespacedKey(plugin, "ganyu_bow");
         this.KEY_DIO_HAND  = new NamespacedKey(plugin, "dio_hand");
@@ -106,7 +110,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Dio <hand|timestop|vampire> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Uraraka <glove|gravity|healpost|levmark> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Naruto <rasengan|disappear|clones> [player]");
-            sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden> [player]"); // UPDATED
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry> [player]"); // <<< UPDATED
             return true;
         }
 
@@ -151,19 +155,15 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             case "dio" -> {
                 switch (sub) {
                     case "hand" -> { itemToGive = makeDioHand();                     pretty = "hand"; }
-                    case "timestop", "stop", "ts", "time" -> {
-                        itemToGive = timeStopListener.makeTimeStopDye();             pretty = "TIME_STOP";
-                    }
-                    case "vampire" -> {
-                        itemToGive = vampireListener.makeVampireDye();               pretty = "Vampire";
-                    }
+                    case "timestop", "stop", "ts", "time" -> { itemToGive = timeStopListener.makeTimeStopDye(); pretty = "TIME_STOP"; }
+                    case "vampire" -> { itemToGive = vampireListener.makeVampireDye(); pretty = "Vampire"; }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Dio: " + sub); return true; }
                 }
             }
             case "uraraka", "ochaco" -> {
                 switch (sub) {
-                    case "glove" -> { itemToGive = urarakaGloveListener.makeGloveSword(); pretty = "Glove"; }
-                    case "gravity" -> { itemToGive = urarakaGravityListener.makeGravityDye(); pretty = "gravity"; }
+                    case "glove" -> { itemToGive = urarakaGloveListener.makeGloveSword();          pretty = "Glove"; }
+                    case "gravity" -> { itemToGive = urarakaGravityListener.makeGravityDye();       pretty = "gravity"; }
                     case "healpost", "heal", "post" -> { itemToGive = urarakaHealPostListener.makeHealPostItem(); pretty = "Heal Post"; }
                     case "levmark", "levitationmark", "lev" -> { itemToGive = levitationMarkListener.makeLevitationMarkDye(); pretty = "Levitation Mark"; }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Uraraka: " + sub); return true; }
@@ -171,16 +171,20 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             }
             case "naruto" -> {
                 switch (sub) {
-                    case "rasengan" -> { itemToGive = narutoRasenganListener.makeRasenganDye(); pretty = "Rasengan"; }
+                    case "rasengan" -> { itemToGive = narutoRasenganListener.makeRasenganDye();      pretty = "Rasengan"; }
                     case "disappear", "vanish", "teleport" -> { itemToGive = disappearListener.makeDisappearanceDye(); pretty = "Disappearance Technique"; }
-                    case "clones", "clone", "shadowclones" -> { itemToGive = narutoClonesListener.makeClonesDye(); pretty = "Clones"; }
+                    case "clones", "clone", "shadowclones" -> { itemToGive = narutoClonesListener.makeClonesDye();     pretty = "Clones"; }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Naruto: " + sub); return true; }
                 }
             }
-            case "burgermaster", "burger" -> {                               // UPDATED
+            case "burgermaster", "burger" -> {
                 switch (sub) {
-                    case "grill"   -> { itemToGive = grillPlacer.makeGrillBlock();              pretty = "grill"; }
-                    case "garden"  -> { itemToGive = gardenPlatform.makeGardenPlatformBlock();  pretty = "Garden Platform"; }
+                    case "grill"   -> { itemToGive = grillPlacer.makeGrillBlock();             pretty = "grill"; }
+                    case "garden"  -> { itemToGive = gardenPlatform.makeGardenPlatformBlock(); pretty = "Garden Platform"; }
+                    case "hungry", "hungrymaster", "beast" -> {                                // <<< NEW
+                        itemToGive = hungryMasterListener.makeHungryDye();                     // item factory
+                        pretty = "Hungry master";
+                    }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для BurgerMaster: " + sub); return true; }
                 }
             }
@@ -246,7 +250,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             if ("uraraka".equalsIgnoreCase(args[0])) return filter(Arrays.asList("glove","gravity","healpost","levmark"), args[1]);
             if ("naruto".equalsIgnoreCase(args[0]))  return filter(Arrays.asList("rasengan","disappear","clones"), args[1]);
             if ("burgermaster".equalsIgnoreCase(args[0]) || "burger".equalsIgnoreCase(args[0]))
-                return filter(Arrays.asList("grill","garden"), args[1]); // UPDATED
+                return filter(Arrays.asList("grill","garden","hungry"), args[1]); // <<< UPDATED
         }
         if (args.length == 3) {
             List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();

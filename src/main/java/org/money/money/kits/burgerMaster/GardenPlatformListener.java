@@ -180,16 +180,6 @@ public final class GardenPlatformListener implements Listener {
         }
     }
 
-    // если игрок вернулся позже, чем истёк таймер — вернуть сразу
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
-    public void onJoin(PlayerJoinEvent e) {
-        UUID id = e.getPlayer().getUniqueId();
-        long until = cooldownUntilMs.getOrDefault(id, 0L);
-        if (System.currentTimeMillis() >= until) {
-            Bukkit.getScheduler().runTask(plugin, () -> giveBackIfMissing(id));
-        }
-    }
-
     /* ===================== ХЕЛПЕРЫ ===================== */
 
     private boolean isAir(Material m) {

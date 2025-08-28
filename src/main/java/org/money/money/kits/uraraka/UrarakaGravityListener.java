@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Uraraka "gravity":
- *  - ПКМ по RED_DYE "gravity": 3s Slowness (разгон) + звук; сразу выдаётся "CancelGravity".
+ *  - ПКМ по FEATHER "gravity": 3s Slowness (разгон) + звук; сразу выдаётся "CancelGravity".
  *  - Через 3s включается 10s окно (armed):
  *      * владелец бьёт ЛЮБОЙ атакой → цель получает Levitation 8s (можно много целей за окно);
  *      * если владельца ударили → подлетает ТОЛЬКО владелец (атакер не подлетает);
@@ -73,7 +73,7 @@ public final class UrarakaGravityListener implements Listener {
     /* -------------------- Items -------------------- */
 
     public ItemStack makeGravityDye() {
-        ItemStack it = new ItemStack(Material.RED_DYE);
+        ItemStack it = new ItemStack(Material.FEATHER);
         ItemMeta im = it.getItemMeta();
         im.displayName(Component.text("gravity"));
         im.getPersistentDataContainer().set(KEY_GRAVITY, PersistentDataType.BYTE, (byte)1);
@@ -82,7 +82,7 @@ public final class UrarakaGravityListener implements Listener {
     }
 
     private ItemStack makeCancelDye() {
-        ItemStack it = new ItemStack(Material.RED_DYE);
+        ItemStack it = new ItemStack(Material.FEATHER);
         ItemMeta im = it.getItemMeta();
         im.displayName(Component.text("CancelGravity"));
         im.getPersistentDataContainer().set(KEY_CANCEL, PersistentDataType.BYTE, (byte)1);
@@ -91,14 +91,14 @@ public final class UrarakaGravityListener implements Listener {
     }
 
     private boolean isGravity(ItemStack it) {
-        if (it == null || it.getType() != Material.RED_DYE || !it.hasItemMeta()) return false;
+        if (it == null || it.getType() != Material.FEATHER || !it.hasItemMeta()) return false;
         ItemMeta im = it.getItemMeta();
         if (im.getPersistentDataContainer().has(KEY_GRAVITY, PersistentDataType.BYTE)) return true;
         return Component.text("gravity").equals(im.displayName());
     }
 
     private boolean isCancel(ItemStack it) {
-        if (it == null || it.getType() != Material.RED_DYE || !it.hasItemMeta()) return false;
+        if (it == null || it.getType() != Material.FEATHER || !it.hasItemMeta()) return false;
         ItemMeta im = it.getItemMeta();
         if (im.getPersistentDataContainer().has(KEY_CANCEL, PersistentDataType.BYTE)) return true;
         return Component.text("CancelGravity").equals(im.displayName());

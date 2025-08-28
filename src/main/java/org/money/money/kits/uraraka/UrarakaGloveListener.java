@@ -33,7 +33,7 @@ public final class UrarakaGloveListener implements Listener {
     public ItemStack makeGloveSword() {
         ItemStack it = new ItemStack(Material.DIAMOND_SWORD);
         ItemMeta im = it.getItemMeta();
-        im.displayName(Component.text("Glove"));
+        im.displayName(Component.text("Hammer"));
         // пометим через PDC, чтобы не путать с пользовательскими мечами
         im.getPersistentDataContainer().set(KEY_GLOVE, PersistentDataType.BYTE, (byte)1);
         // косметика по желанию:
@@ -48,7 +48,7 @@ public final class UrarakaGloveListener implements Listener {
         // предпочитаем PDC-маркер
         if (im.getPersistentDataContainer().has(KEY_GLOVE, PersistentDataType.BYTE)) return true;
         // запасной вариант по имени
-        return Component.text("Glove").equals(im.displayName());
+        return Component.text("Hammer").equals(im.displayName());
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)

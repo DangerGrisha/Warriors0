@@ -236,9 +236,9 @@ public final class GanyuBudListener implements Listener {
             s.setBasePlate(false); // опционально, убрать «пяточку»
 
 
-            s.setCustomNameVisible(true);
-            s.setCustomName("§bFrostbud");
-            ItemStack flower = new ItemStack(Material.BLUE_ORCHID);
+            s.setCustomNameVisible(false);
+            //s.setCustomName("§bFrostbud");
+            ItemStack flower = new ItemStack(Material.CORNFLOWER);
             ItemMeta fm = flower.getItemMeta(); fm.displayName(Component.text(("FrostBud"))); flower.setItemMeta(fm);
             s.getEquipment().setItemInMainHand(flower);
             var pdc = s.getPersistentDataContainer();

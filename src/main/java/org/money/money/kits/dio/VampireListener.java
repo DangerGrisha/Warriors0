@@ -4,12 +4,12 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
@@ -49,8 +49,8 @@ public final class VampireListener implements Listener {
     private final NamespacedKey KEY_MASK;
 
     // состояния
-    private final Set<UUID> winding = new HashSet<>();           // 3-сек «завод»
-    private final Set<UUID> active  = new HashSet<>();           // 40-сек форма
+    private final Set<UUID> winding = new HashSet<>();             // 3-сек «завод»
+    private final Set<UUID> active  = new HashSet<>();             // 40-сек форма
     private final Map<UUID, Long> cooldownUntil = new HashMap<>(); // real-time кд
 
     // вернуть шлем и макс. хп
@@ -64,6 +64,7 @@ public final class VampireListener implements Listener {
         this.plugin = Objects.requireNonNull(plugin);
         this.KEY_ITEM = new NamespacedKey(plugin, "vampire_item");
         this.KEY_MASK = new NamespacedKey(plugin, "vampire_mask");
+        Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
     /* =============== предметы =============== */
@@ -77,15 +78,12 @@ public final class VampireListener implements Listener {
         return it;
     }
 
+    /** «Маска» теперь тоже RED_DYE с отдельным PDC-флагом. */
     private ItemStack makeMask() {
-        ItemStack it = new ItemStack(Material.DIAMOND_HELMET);
+        ItemStack it = new ItemStack(Material.RED_DYE);
         ItemMeta im = it.getItemMeta();
         im.displayName(Component.text("Vampire"));
-        im.addEnchant(Enchantment.BINDING_CURSE, 1, true); // проклятая несьемность
-        im.setUnbreakable(true);
-        im.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS,
-                org.bukkit.inventory.ItemFlag.HIDE_ATTRIBUTES,
-                org.bukkit.inventory.ItemFlag.HIDE_UNBREAKABLE);
+        // делаем уникальной (чтоб случайно не стакалась с обычными красителями)
         im.getPersistentDataContainer().set(KEY_MASK, PersistentDataType.BYTE, (byte)1);
         it.setItemMeta(im);
         return it;
@@ -96,7 +94,7 @@ public final class VampireListener implements Listener {
         return it.getItemMeta().getPersistentDataContainer().has(KEY_ITEM, PersistentDataType.BYTE);
     }
     private boolean isOurMask(ItemStack it) {
-        if (it == null || it.getType() != Material.DIAMOND_HELMET || !it.hasItemMeta()) return false;
+        if (it == null || it.getType() != Material.RED_DYE || !it.hasItemMeta()) return false;
         return it.getItemMeta().getPersistentDataContainer().has(KEY_MASK, PersistentDataType.BYTE);
     }
 
@@ -187,7 +185,7 @@ public final class VampireListener implements Listener {
         double max = p.getAttribute(Attribute.MAX_HEALTH).getBaseValue();
         p.setHealth(Math.min(max, p.getHealth() + HEAL_ON_START));
 
-        // надеваем маску
+        // надеваем НА ГОЛОВУ наш RED_DYE "Vampire"
         p.getInventory().setHelmet(makeMask());
         p.playSound(p.getLocation(), Sound.ENTITY_WITHER_AMBIENT, 0.6f, 0.6f);
         active.add(id);
@@ -208,7 +206,7 @@ public final class VampireListener implements Listener {
             if (p.getHealth() > prev) p.setHealth(prev);
         }
 
-        // снять нашу маску и вернуть прежний шлем
+        // снять нашу «маску» и вернуть прежний шлем
         ItemStack curr = p.getInventory().getHelmet();
         if (isOurMask(curr)) p.getInventory().setHelmet(null);
         ItemStack old = prevHelm.remove(id);
@@ -247,26 +245,30 @@ public final class VampireListener implements Listener {
         p.spawnParticle(Particle.HEART, p.getLocation().add(0, 1.2, 0), 2, 0.2, 0.2, 0.2, 0.0);
     }
 
-    /* =============== запрет снимать маску =============== */
+    /* =============== запрет снимать «маску» =============== */
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onInvClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (!active.contains(p.getUniqueId())) return;
 
-        // запретим любые операции со слотом головы, если там наша маска
-        if (e.getSlotType() == InventoryType.SlotType.ARMOR || e.getSlot() == p.getInventory().getHeldItemSlot()) {
-            ItemStack helm = p.getInventory().getHelmet();
-            if (isOurMask(helm)) {
-                // попытки снять/переместить
-                if (e.getSlot() == 5 /*helmet slot index in player inv*/ || e.getSlotType() == InventoryType.SlotType.ARMOR) {
-                    e.setCancelled(true);
-                }
-                // блокируем shift-клик/движение маски
-                if (isOurMask(e.getCurrentItem()) || isOurMask(e.getCursor())) {
-                    e.setCancelled(true);
-                }
-            }
+        ItemStack helm = p.getInventory().getHelmet();
+        if (!isOurMask(helm)) return;
+
+        // блокируем любые операции со слотом головы, а также перенос самой маски
+        if (e.getSlotType() == InventoryType.SlotType.ARMOR) {
+            e.setCancelled(true);
+        }
+        if (isOurMask(e.getCurrentItem()) || isOurMask(e.getCursor())) {
+            e.setCancelled(true);
+        }
+        // блокируем хотбарные свопы числовыми клавишами на слот головы
+        if (e.getClick() == ClickType.NUMBER_KEY) {
+            e.setCancelled(true);
+        }
+        // страховка от shift-клика
+        if (e.isShiftClick()) {
+            e.setCancelled(true);
         }
     }
 
@@ -278,7 +280,7 @@ public final class VampireListener implements Listener {
         winding.remove(id);
         BukkitTask hb = heartbeat.remove(id);
         if (hb != null) hb.cancel();
-        if (active.contains(id)) exitForm(e.getPlayer(), false); // без запуска кд — кд уже тикает real-time по возврату предмета
+        if (active.contains(id)) exitForm(e.getPlayer(), false); // без запуска кд
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
@@ -291,7 +293,6 @@ public final class VampireListener implements Listener {
         if (active.contains(id)) exitForm(p, true);
     }
 
-    // на входе — если кд прошёл, но предмета нет, вернём
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
