@@ -27,6 +27,7 @@ import org.money.money.kits.uraraka.LevitationMarkListener;
 import org.money.money.kits.uraraka.UrarakaGloveListener;
 import org.money.money.kits.uraraka.UrarakaGravityListener;
 import org.money.money.kits.uraraka.UrarakaHealPostListener;
+import org.bukkit.enchantments.Enchantment;
 
 import java.util.*;
 
@@ -111,6 +112,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Uraraka <glove|gravity|healpost|levmark> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Naruto <rasengan|disappear|clones> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry> [player]"); // <<< UPDATED
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry|sword> [player]");
             return true;
         }
 
@@ -181,13 +183,18 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                 switch (sub) {
                     case "grill"   -> { itemToGive = grillPlacer.makeGrillBlock();             pretty = "grill"; }
                     case "garden"  -> { itemToGive = gardenPlatform.makeGardenPlatformBlock(); pretty = "Garden Platform"; }
-                    case "hungry", "hungrymaster", "beast" -> {                                // <<< NEW
-                        itemToGive = hungryMasterListener.makeHungryDye();                     // item factory
+                    case "hungry", "hungrymaster", "beast" -> {
+                        itemToGive = hungryMasterListener.makeHungryDye();
                         pretty = "Hungry master";
+                    }
+                    case "sword" -> {                                      // <<< NEW
+                        itemToGive = makeBurgerSword();                    // <<< NEW
+                        pretty = "sword";                                  // <<< NEW
                     }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для BurgerMaster: " + sub); return true; }
                 }
             }
+
             default -> { sender.sendMessage(ChatColor.RED + "Неизвестный герой: " + args[0]); return true; }
         }
 
@@ -205,7 +212,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    /** Ganyu bow с тегом. */
+    /** Ganyu bow с тегом + Infinity. */
     private ItemStack makeGanyuBow() {
         ItemStack it = new ItemStack(Material.BOW);
         ItemMeta im = it.getItemMeta();
@@ -214,6 +221,10 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                 ChatColor.GRAY + "Hold to charge for 3s",
                 ChatColor.GRAY + "Release to fire an icy arrow"
         ));
+
+        // чары
+        im.addEnchant(Enchantment.INFINITY, 1, true); // «Бесконечность I»
+
         im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE);
         im.setUnbreakable(true);
         im.getPersistentDataContainer().set(KEY_GANYU_BOW, PersistentDataType.BYTE, (byte)1);
@@ -250,7 +261,8 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             if ("uraraka".equalsIgnoreCase(args[0])) return filter(Arrays.asList("glove","gravity","healpost","levmark"), args[1]);
             if ("naruto".equalsIgnoreCase(args[0]))  return filter(Arrays.asList("rasengan","disappear","clones"), args[1]);
             if ("burgermaster".equalsIgnoreCase(args[0]) || "burger".equalsIgnoreCase(args[0]))
-                return filter(Arrays.asList("grill","garden","hungry"), args[1]); // <<< UPDATED
+                return filter(Arrays.asList("grill","garden","hungry","sword"), args[1]); // UPDATED
+
         }
         if (args.length == 3) {
             List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
@@ -264,5 +276,16 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         List<String> out = new ArrayList<>();
         for (String s : base) if (s.toLowerCase(Locale.ROOT).startsWith(t)) out.add(s);
         return out;
+    }
+    /** BurgerMaster sword — iron sword, Knockback II, unbreakable. */
+    private ItemStack makeBurgerSword() {
+        ItemStack it = new ItemStack(Material.IRON_SWORD);
+        ItemMeta im = it.getItemMeta();
+        im.displayName(Component.text("sword")); // простое имя "sword"
+        im.addEnchant(Enchantment.KNOCKBACK, 2, true); // отдача II
+        im.setUnbreakable(true);
+        im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_UNBREAKABLE);
+        it.setItemMeta(im);
+        return it;
     }
 }

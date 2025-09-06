@@ -338,13 +338,4 @@ public final class TimeStopListener implements Listener {
         windingUp.remove(id);
         stopWindupVisuals(id);
     }
-
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
-    public void onJoin(PlayerJoinEvent e) {
-        Player p = e.getPlayer();
-        long until = cooldownUntilMs.getOrDefault(p.getUniqueId(), 0L);
-        if (System.currentTimeMillis() >= until && !playerHasTimeStopItem(p)) {
-            Bukkit.getScheduler().runTask(plugin, () -> giveBackTimeStop(p));
-        }
-    }
 }

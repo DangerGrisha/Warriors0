@@ -385,15 +385,4 @@ public final class NarutoRasenganListener implements Listener {
         removeCoreIfPresent(e.getEntity().getUniqueId());
         noFallUntilMs.remove(e.getEntity().getUniqueId());
     }
-
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
-    public void onJoin(PlayerJoinEvent e) {
-        Player p = e.getPlayer();
-        long until = cooldownUntilMs.getOrDefault(p.getUniqueId(), 0L);
-        if (System.currentTimeMillis() >= until && !playerHasRasengan(p)) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                giveBackIfMissing(p.getUniqueId());
-            });
-        }
-    }
 }

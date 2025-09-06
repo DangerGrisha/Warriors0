@@ -293,12 +293,4 @@ public final class VampireListener implements Listener {
         if (active.contains(id)) exitForm(p, true);
     }
 
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
-    public void onJoin(PlayerJoinEvent e) {
-        Player p = e.getPlayer();
-        long until = cooldownUntil.getOrDefault(p.getUniqueId(), 0L);
-        if (System.currentTimeMillis() >= until) {
-            Bukkit.getScheduler().runTask(plugin, () -> giveBackDye(p));
-        }
-    }
 }

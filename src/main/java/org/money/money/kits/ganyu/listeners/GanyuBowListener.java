@@ -27,7 +27,7 @@ public final class GanyuBowListener implements Listener {
     private final ElementalReactions elemental;
 
     private static final double FREEZE_RADIUS = 3.0;      // радиус взрыва
-    private static final int    SLOW_TICKS    = 60;       // 3 сек (20 тиков = 1 сек)
+    private static final int    SLOW_TICKS    = 50;       // 3 сек (20 тиков = 1 сек)
     private static final int    SLOW_LEVEL    = 1;        // Slowness II
     private static final int    FREEZE_ADD    = 80;       // +4 сек к текущему фризу
     private static final int    DIRECT_HIT_BONUS_FREEZE = 40; // +2 сек дополнительно при прямом попадании

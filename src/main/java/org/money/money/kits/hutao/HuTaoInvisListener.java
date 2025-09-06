@@ -35,8 +35,9 @@ public final class HuTaoInvisListener implements Listener {
     private final Plugin plugin;
 
     // PDC keys
-    private final NamespacedKey KEY_HOMA;   // <-- исправлено: везде единое имя
+    private final NamespacedKey KEY_HOMA;
     private final NamespacedKey KEY_REMOVE;
+    private final NamespacedKey KEY_INVIS_TOTEM; // <-- метка «InvisTotem»
 
     // активные состояния
     private final Set<UUID> active = new HashSet<>();
@@ -44,48 +45,39 @@ public final class HuTaoInvisListener implements Listener {
     private final Map<UUID, Integer> storedSlot = new HashMap<>();
     private final Map<UUID, BukkitTask> particleTask = new HashMap<>();
     private final Map<UUID, BukkitTask> timeoutTask  = new HashMap<>();
+    private final Map<UUID, ItemStack> storedOffhandTotem = new HashMap<>(); // <-- исходный тотем
 
     public HuTaoInvisListener(Plugin plugin) {
         this.plugin = plugin;
-        this.KEY_HOMA   = new NamespacedKey(plugin, "hutao_homa");
-        this.KEY_REMOVE = new NamespacedKey(plugin, "hutao_remove_invis");
+        this.KEY_HOMA        = new NamespacedKey(plugin, "hutao_homa");
+        this.KEY_REMOVE      = new NamespacedKey(plugin, "hutao_remove_invis");
+        this.KEY_INVIS_TOTEM = new NamespacedKey(plugin, "hutao_invis_totem");
     }
 
     /* ===================== Public factory ===================== */
 
-    /** Алмазный меч Staff of Homa (урон 3.5, скорость атаки 3.2). */
+    /** Алмазный меч Staff of Homa (урон 3.5, скорость атаки +0.8). */
     public ItemStack makeHoma() {
         ItemStack sword = new ItemStack(Material.DIAMOND_SWORD);
         ItemMeta im = sword.getItemMeta();
         im.displayName(Component.text("§6Staff of Homa"));
         im.setUnbreakable(true);
         im.getPersistentDataContainer().set(KEY_HOMA, PersistentDataType.BYTE, (byte) 1);
-
         applyHomaStats(im);
-
-        // (опционально) спрятать «зелёные» строки и написать свои в lore
-        // im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         sword.setItemMeta(im);
         return sword;
     }
 
-    /** Применяем атрибуты: финальный dmg=3.5, speed=3.2 (т.е. +2.5 и -0.8 к базовым 1.0/4.0). */
     private void applyHomaStats(ItemMeta im) {
-        im.setAttributeModifiers(null); // убрать ванильные
-
+        im.setAttributeModifiers(null);
         AttributeModifier dmg = new AttributeModifier(
                 new NamespacedKey(plugin, "homa_damage"),
-                3.5,
-                AttributeModifier.Operation.ADD_NUMBER,
-                EquipmentSlotGroup.MAINHAND
+                5, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND
         );
         AttributeModifier spd = new AttributeModifier(
                 new NamespacedKey(plugin, "homa_speed"),
-                0.8,
-                AttributeModifier.Operation.ADD_NUMBER,
-                EquipmentSlotGroup.MAINHAND
+                0.8, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND
         );
-
         im.addAttributeModifier(Attribute.ATTACK_DAMAGE, dmg);
         im.addAttributeModifier(Attribute.ATTACK_SPEED, spd);
     }
@@ -98,8 +90,6 @@ public final class HuTaoInvisListener implements Listener {
         if (!p.isSprinting()) return;
 
         ItemStack hand = p.getInventory().getItemInMainHand();
-
-        // триггерим, если держит либо Homa, либо красный краситель
         if (isHoma(hand) || isRemove(hand)) {
             boolean holdingRemove = isRemove(hand);
             startOrRefreshInvis(p, holdingRemove);
@@ -123,6 +113,7 @@ public final class HuTaoInvisListener implements Listener {
 
         stopInvis(p, true);
     }
+
     private boolean replaceRemoveDyeWithSwordAnywhere(Player p, ItemStack sword) {
         var inv = p.getInventory();
 
@@ -134,17 +125,13 @@ public final class HuTaoInvisListener implements Listener {
         ItemStack off = inv.getItemInOffHand();
         if (isRemove(off)) { inv.setItemInOffHand(sword); return true; }
 
-        // 3) хранение/горячая панель: индексы 0..35
+        // 3) инвентарь/горячая панель
         for (int i = 0; i < 36; i++) {
             ItemStack it = inv.getItem(i);
-            if (isRemove(it)) {
-                inv.setItem(i, sword);
-                return true;
-            }
+            if (isRemove(it)) { inv.setItem(i, sword); return true; }
         }
         return false;
     }
-
 
     /* страховки */
     @EventHandler public void onQuit(PlayerQuitEvent e)   { stopInvis(e.getPlayer(), true); }
@@ -157,11 +144,15 @@ public final class HuTaoInvisListener implements Listener {
                 && it.hasItemMeta()
                 && it.getItemMeta().getPersistentDataContainer().has(KEY_HOMA, PersistentDataType.BYTE);
     }
-
     private boolean isRemove(ItemStack it) {
         return it != null && it.getType() == Material.RED_DYE
                 && it.hasItemMeta()
                 && it.getItemMeta().getPersistentDataContainer().has(KEY_REMOVE, PersistentDataType.BYTE);
+    }
+    private boolean isInvisTotem(ItemStack it) {
+        return it != null && it.getType() == Material.TOTEM_OF_UNDYING
+                && it.hasItemMeta()
+                && it.getItemMeta().getPersistentDataContainer().has(KEY_INVIS_TOTEM, PersistentDataType.BYTE);
     }
 
     private ItemStack makeRemoveItem() {
@@ -169,6 +160,16 @@ public final class HuTaoInvisListener implements Listener {
         ItemMeta im = it.getItemMeta();
         im.displayName(Component.text("Remove Invis"));
         im.getPersistentDataContainer().set(KEY_REMOVE, PersistentDataType.BYTE, (byte) 1);
+        im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        it.setItemMeta(im);
+        return it;
+    }
+
+    private ItemStack makeInvisTotem() {
+        ItemStack it = new ItemStack(Material.TOTEM_OF_UNDYING);
+        ItemMeta im = it.getItemMeta();
+        im.displayName(Component.text("InvisTotem"));
+        im.getPersistentDataContainer().set(KEY_INVIS_TOTEM, PersistentDataType.BYTE, (byte) 1);
         im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         it.setItemMeta(im);
         return it;
@@ -189,9 +190,18 @@ public final class HuTaoInvisListener implements Listener {
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!holdingRemove) {
             if (!isHoma(hand)) return;
+
+            // заменяем меч на dye и запоминаем меч + слот
             storedSword.put(id, hand.clone());
             storedSlot.put(id, p.getInventory().getHeldItemSlot());
             p.getInventory().setItemInMainHand(makeRemoveItem());
+
+            // офф-хенд: если там обычный тотем — заменить на InvisTotem и запомнить оригинал
+            ItemStack off = p.getInventory().getItemInOffHand();
+            if (off != null && off.getType() == Material.TOTEM_OF_UNDYING && !isInvisTotem(off)) {
+                storedOffhandTotem.put(id, off.clone());
+                p.getInventory().setItemInOffHand(makeInvisTotem());
+            }
         }
 
         p.playSound(p.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_TWINKLE, 0.5f, 1.8f);
@@ -210,6 +220,9 @@ public final class HuTaoInvisListener implements Listener {
         cleanupTasks(id);
         p.removePotionEffect(PotionEffectType.INVISIBILITY);
 
+        // восстановить офф-хенд тотем (независимо от restoreSword)
+        restoreOffhandTotem(p);
+
         if (!restoreSword) {
             storedSword.remove(id);
             storedSlot.remove(id);
@@ -223,7 +236,7 @@ public final class HuTaoInvisListener implements Listener {
         // СНАЧАЛА пробуем заменить краситель где угодно
         if (replaceRemoveDyeWithSwordAnywhere(p, sword)) return;
 
-        // Если красителя уже нет — вернём в исходный слот, если пуст
+        // Если красителя уже нет — вернуть в исходный слот, если пуст
         if (slot != null) {
             ItemStack cur = p.getInventory().getItem(slot);
             if (cur == null || cur.getType() == Material.AIR) {
@@ -237,6 +250,31 @@ public final class HuTaoInvisListener implements Listener {
         rem.values().forEach(it -> p.getWorld().dropItemNaturally(p.getLocation(), it));
     }
 
+    private void restoreOffhandTotem(Player p) {
+        UUID id = p.getUniqueId();
+        ItemStack saved = storedOffhandTotem.remove(id);
+        ItemStack off   = p.getInventory().getItemInOffHand();
+
+        if (saved == null) {
+            // ничего не сохраняли — если вдруг висит «левый» InvisTotem, заменим на обычный
+            if (isInvisTotem(off)) p.getInventory().setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
+            return;
+        }
+
+        if (isInvisTotem(off)) {
+            // чисто заменить наш маркер на исходный тотем
+            p.getInventory().setItemInOffHand(saved);
+            return;
+        }
+
+        // если офф-хенд занят/не наш — положим в офф-хенд, если пусто; иначе в инвентарь (лишнее — на землю)
+        if (off == null || off.getType() == Material.AIR) {
+            p.getInventory().setItemInOffHand(saved);
+        } else {
+            Map<Integer, ItemStack> rem = p.getInventory().addItem(saved);
+            rem.values().forEach(it -> p.getWorld().dropItemNaturally(p.getLocation(), it));
+        }
+    }
 
     private void startButterflies(Player p) {
         UUID id = p.getUniqueId();
