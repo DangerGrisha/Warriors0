@@ -177,7 +177,7 @@ public final class GanyuBowListener implements Listener {
 
             double d = elemental.applyOnTotalDamage(
                     le,
-                    2.0, // 1 сердце
+                    6.0, // 2 сердце
                     ElementalReactions.Element.CRYO,
                     /*newAuraTicks=*/FREEZE_ADD,
                     /*consumeOnReact=*/true

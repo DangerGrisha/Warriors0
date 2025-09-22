@@ -72,7 +72,7 @@ public final class HuTaoInvisListener implements Listener {
         im.setAttributeModifiers(null);
         AttributeModifier dmg = new AttributeModifier(
                 new NamespacedKey(plugin, "homa_damage"),
-                5, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND
+                4, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND
         );
         AttributeModifier spd = new AttributeModifier(
                 new NamespacedKey(plugin, "homa_speed"),

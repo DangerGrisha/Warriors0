@@ -51,7 +51,7 @@ public final class GanyuBudListener implements Listener {
     private static final int    FREEZE_ADD   = 80;             // +4с к фризу
     private static final int    SLOW_TICKS   = 60;             // 3с слоунесс
     private static final int    SLOW_LEVEL   = 1;              // Slowness II
-    private static final double BUD_DAMAGE   = 2.0;            // 1❤ урона
+    private static final double BUD_DAMAGE   = 4.0;            // 1❤ урона
 
     private static final int    COOLDOWN_TICKS = 20 * 80;      // 80 сек
 

@@ -46,7 +46,7 @@ public final class GanyuUltListener implements Listener {
     private static final int    RAIN_INTERVAL_TICKS  = 2;        // каждые 0.4с спавним «ледяную болванку»
     private static final int    HITTER_CHECK_TICKS   = 2;        // как часто проверять приземление
     private static final double HITTER_IMPACT_RADIUS = 6.0;      // АОЕ при ударе
-    private static final double HITTER_DAMAGE        = 3.0;      // 1.5 ❤ урона
+    private static final double HITTER_DAMAGE        = 4;      // 2 ❤ урона
 
     private static final int    FREEZE_ADD_TICKS     = 100;      // +5с инея
     private static final int    SLOW_TICKS           = 80;       // 4с
