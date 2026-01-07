@@ -10,6 +10,8 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import org.money.money.kits.airwalker.WindListener;
+import org.money.money.kits.airwalker.WindUltListener;
 import org.money.money.kits.burgerMaster.GrillPlaceListener;
 import org.money.money.kits.burgerMaster.GardenPlatformListener;
 import org.money.money.kits.burgerMaster.HungryMasterListener;      // <<< NEW
@@ -52,6 +54,8 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     private final GrillPlaceListener grillPlacer;                     // BurgerMaster: grill
     private final GardenPlatformListener gardenPlatform;              // BurgerMaster: garden
     private final HungryMasterListener hungryMasterListener;          // BurgerMaster: hungry  <<< NEW
+    private final WindListener windListener;
+    private final WindUltListener windultListener;
 
     private final NamespacedKey KEY_GANYU_BOW;
     private final NamespacedKey KEY_DIO_HAND;
@@ -73,7 +77,8 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                           NarutoClonesListener narutoClonesListener,
                           GrillPlaceListener grillPlacer,
                           GardenPlatformListener gardenPlatform,
-                          HungryMasterListener hungryMasterListener) {              // <<< NEW
+                          HungryMasterListener hungryMasterListener,
+                          WindListener windListener, WindUltListener windUltListener) {              // <<< NEW
 
         this.plugin = Objects.requireNonNull(plugin);
         this.budListener = Objects.requireNonNull(budListener);
@@ -93,6 +98,8 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.grillPlacer             = Objects.requireNonNull(grillPlacer);
         this.gardenPlatform          = Objects.requireNonNull(gardenPlatform);
         this.hungryMasterListener    = Objects.requireNonNull(hungryMasterListener); // <<< NEW
+        this.windListener    = Objects.requireNonNull(windListener);
+        this.windultListener   = Objects.requireNonNull(windUltListener);
 
         this.KEY_GANYU_BOW = new NamespacedKey(plugin, "ganyu_bow");
         this.KEY_DIO_HAND  = new NamespacedKey(plugin, "dio_hand");
@@ -113,6 +120,8 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Naruto <rasengan|disappear|clones> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry> [player]"); // <<< UPDATED
             sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry|sword> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " AirWalker <wind|windult> [player]");
+
             return true;
         }
 
@@ -194,6 +203,24 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для BurgerMaster: " + sub); return true; }
                 }
             }
+            case "airwalker", "airwaler", "wind" -> {
+                switch (sub) {
+                    case "wind" -> {
+                        itemToGive = windListener.makeWindDye();   // ВОТ ЭТО ГЛАВНОЕ
+                        pretty = "Wind";
+                    }
+                    case "windult", "ult" -> {
+                        itemToGive = windultListener.makeWindUltDye();
+                        pretty = "WindUlt";
+                    }
+                    default -> {
+                        sender.sendMessage(ChatColor.RED + "Неизвестный предмет для AirWalker: " + sub);
+                        sender.sendMessage(ChatColor.GRAY + "Доступно: wind");
+                        return true;
+                    }
+                }
+            }
+
 
             default -> { sender.sendMessage(ChatColor.RED + "Неизвестный герой: " + args[0]); return true; }
         }
@@ -253,7 +280,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (!sender.hasPermission("kits.give")) return List.of();
 
-        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster"), args[0]);
+        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker"), args[0]);
         if (args.length == 2) {
             if ("ganyu".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("bow","bud","ult"), args[1]);
             if ("hutao".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("homa","pyro","ult"), args[1]);
@@ -261,7 +288,9 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             if ("uraraka".equalsIgnoreCase(args[0])) return filter(Arrays.asList("glove","gravity","healpost","levmark"), args[1]);
             if ("naruto".equalsIgnoreCase(args[0]))  return filter(Arrays.asList("rasengan","disappear","clones"), args[1]);
             if ("burgermaster".equalsIgnoreCase(args[0]) || "burger".equalsIgnoreCase(args[0]))
-                return filter(Arrays.asList("grill","garden","hungry","sword"), args[1]); // UPDATED
+                return filter(Arrays.asList("grill","garden","hungry","sword"), args[1]);
+            if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker"), args[0]);
+
 
         }
         if (args.length == 3) {

@@ -3,6 +3,8 @@ package org.money.money;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import org.money.money.combat.ElementalReactions;
+import org.money.money.kits.airwalker.WindListener;
+import org.money.money.kits.airwalker.WindUltListener;
 import org.money.money.kits.burgerMaster.GardenPlatformListener;
 import org.money.money.kits.burgerMaster.GrillManager;
 import org.money.money.kits.burgerMaster.GrillPlaceListener;
@@ -57,6 +59,8 @@ public final class Main extends JavaPlugin {
         var grill = new GrillPlaceListener(this,grillManager);
         var garden = new GardenPlatformListener(this);
         var hungry = new HungryMasterListener(this);
+        var wind = new WindListener(this);
+        var windult = new WindUltListener(this);
 
         getServer().getPluginManager().registerEvents(bow,  this);
         getServer().getPluginManager().registerEvents(bud,  this);
@@ -78,9 +82,12 @@ public final class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(grill, this);
         getServer().getPluginManager().registerEvents(garden, this);
         getServer().getPluginManager().registerEvents(hungry, this);
+        getServer().getPluginManager().registerEvents(wind, this);
+        getServer().getPluginManager().registerEvents(windult, this);
+
 
         var kit = new KitGiveCommand(this, bud, ult, homa, pyro, boom, timestop, vampire, glove, gravity, post,
-                levitationMark, rassengan, randomtp, clones, grill, garden, hungry);
+                levitationMark, rassengan, randomtp, clones, grill, garden, hungry, wind, windult);
         getCommand("kitgive").setExecutor(kit);
         getCommand("kitgive").setTabCompleter(kit);
     }
