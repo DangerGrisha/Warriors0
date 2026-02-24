@@ -1,0 +1,196 @@
+maps:
+  - id: lastwarGame1
+    displayName: "LastWar #1"
+    worldName: "lastwarGame1"
+    templateWorld: "lastwarGame0"     # ✅ откуда клоним
+    minPlayers: 2
+    maxPlayers: 16
+    enabled: true
+
+    lobbySpawn:                       # ✅ куда телепаем в лобби (в мире "world" или отдельном)
+      world: "world"
+      x: -165
+      y: 183
+      z: 297
+      yaw: 0
+      pitch: 0
+
+    border:
+      centerX: -165
+      centerZ: 297
+      startSize: 350.0       # диаметр (не радиус)
+      endSize: 1.0
+      totalSeconds: 600     # 20 минут
+      shrinkAfterSeconds: 400 # через 10 минут начать
+      shrinkDurationSeconds: 150 # 9 минут сужение (10..19)
+      damageAmount: 2.0
+      damageBuffer: 0.0
+      warningSeconds: 10
+      warningDistance: 5                   # size = диаметр. радиус = size/2
+
+    mobs:
+      enabled: true
+      packs: 10
+      minPackSize: 2
+      maxPackSize: 4
+      maxAttemptsPerPack: 16
+      jitterRadius: 6
+      mobJitterRadius: 3
+
+    spawn:                             # ✅ спавн игроков (вокруг центра)
+      centerX: -164.5
+      centerY: 184
+      centerZ: 297.5
+      radius: 150                        # радиус случайного спавна
+      safeCheckRadius: 2               # в блоках проверять область вокруг точки
+
+    blocks:
+    unbreakable: [ "BEDROCK","BARRIER" ] # ✅ вообще нельзя ломать
+    breakable3hits: [ "STONE","COBBLESTONE", "DIRT", "GRASS" ]  # ✅ можно ломать “с 3 раза”
+
+  - id: lastwarGame2
+    displayName: "LastWar #2"
+    worldName: "lastwarGame2"
+    templateWorld: "lastwarGame0"     # ✅ откуда клоним
+    minPlayers: 2
+    maxPlayers: 16
+    enabled: true
+
+    lobbySpawn: # ✅ куда телепаем в лобби (в мире "world" или отдельном)
+      world: "world"
+      x: -165
+      y: 183
+      z: 297
+      yaw: 0
+      pitch: 0
+
+    border:
+      centerX: -165
+      centerZ: 297
+      startSize: 350.0       # диаметр (не радиус)
+      endSize: 1.0
+      totalSeconds: 600     # 20 минут
+      shrinkAfterSeconds: 400 # через 10 минут начать
+      shrinkDurationSeconds: 150 # 9 минут сужение (10..19)
+      damageAmount: 2.0
+      damageBuffer: 0.0
+      warningSeconds: 10
+      warningDistance: 5                   # size = диаметр. радиус = size/2
+
+    mobs:
+      enabled: true
+      packs: 10
+      minPackSize: 2
+      maxPackSize: 4
+      maxAttemptsPerPack: 16
+      jitterRadius: 6
+      mobJitterRadius: 3
+
+    spawn: # ✅ спавн игроков (вокруг центра)
+      centerX: -164.5
+      centerY: 184
+      centerZ: 297.5
+      radius: 150                        # радиус случайного спавна
+      safeCheckRadius: 2               # в блоках проверять область вокруг точки
+
+    blocks:
+    unbreakable: [ "BEDROCK","BARRIER" ] # ✅ вообще нельзя ломать
+    breakable3hits: [ "STONE","COBBLESTONE", "DIRT", "GRASS" ]  # ✅ можно ломать “с 3 раза”
+
+  - id: lastwarTowers1
+    displayName: "LastWarTowers #1"
+    worldName: "lastwarTowers1"
+    templateWorld: "lastwarTowers0"     # ✅ откуда клоним
+    minPlayers: 2
+    maxPlayers: 16
+    enabled: true
+
+    lobbySpawn:                       # ✅ куда телепаем в лобби (в мире "world" или отдельном)
+      world: "world"
+      x: -108
+      y: 161
+      z: 479
+      yaw: -90
+      pitch: 0
+
+    border:
+      centerX: -18
+      centerZ: 478
+      startSize: 350.0       # диаметр (не радиус)
+      endSize: 1.0
+      totalSeconds: 600     # 20 минут
+      shrinkAfterSeconds: 400 # через 10 минут начать
+      shrinkDurationSeconds: 150 # 9 минут сужение (10..19)
+      damageAmount: 2.0
+      damageBuffer: 0.0
+      warningSeconds: 10
+      warningDistance: 5                   # size = диаметр. радиус = size/2
+
+    mobs:
+      enabled: true
+      packs: 10
+      minPackSize: 2
+      maxPackSize: 4
+      maxAttemptsPerPack: 16
+      jitterRadius: 6
+      mobJitterRadius: 3
+
+    spawn:                             # ✅ спавн игроков (вокруг центра)
+      centerX: -18
+      centerY: 184
+      centerZ: 472
+      radius: 130                        # радиус случайного спавна
+      safeCheckRadius: 2               # в блоках проверять область вокруг точки
+
+    blocks:
+    unbreakable: [ "BEDROCK","BARRIER" ] # ✅ вообще нельзя ломать
+    breakable3hits: [ "STONE","COBBLESTONE", "DIRT", "GRASS" ]  # ✅ можно ломать “с 3 раза”
+
+  - id: lastwarBridge1
+    displayName: "LastWarBridge #1"
+    worldName: "lastwarBridge"
+    templateWorld: "lastwarTowers0"     # ✅ откуда клоним
+    minPlayers: 2
+    maxPlayers: 16
+    enabled: true
+
+    lobbySpawn:                       # ✅ куда телепаем в лобби (в мире "world" или отдельном)
+      world: "world"
+      x: 311
+      y: 33
+      z: 111
+      yaw: 0
+      pitch: 0
+
+    border:
+      centerX: 217
+      centerZ: 110
+      startSize: 300.0       # диаметр (не радиус)
+      endSize: 1.0
+      totalSeconds: 600
+      shrinkAfterSeconds: 400
+      shrinkDurationSeconds: 150 # 9 минут сужение (10..19)
+      damageAmount: 2.0
+      damageBuffer: 0.0
+      warningSeconds: 10
+      warningDistance: 5                   # size = диаметр. радиус = size/2
+
+    mobs:
+      enabled: true
+      packs: 10
+      minPackSize: 2
+      maxPackSize: 4
+      maxAttemptsPerPack: 16
+      jitterRadius: 6
+      mobJitterRadius: 3
+
+    spawn:                             # ✅ спавн игроков (вокруг центра)
+      centerX: 217
+      centerY: 40
+      centerZ: 110
+      radius: 130                        # радиус случайного спавна
+      safeCheckRadius: 2               # в блоках проверять область вокруг точки
+
+    blocks:
+    unbreakable: [ "BEDROCK","BARRIER" ] # ✅ вообще нельзя ломать
+    breakable3hits: [ "STONE","COBBLESTONE", "DIRT", "GRASS" ]  # ✅ можно ломать “с 3 раза”

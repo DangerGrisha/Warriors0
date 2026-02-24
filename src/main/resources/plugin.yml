@@ -1,19 +1,14 @@
-name: LastWarriors0
+name: LwLogic2
 main: org.money.money.Main
 version: 1.0
 api-version: 1.21
 
 commands:
-  kitgive:
-    description: Give kit items for heroes (Ganyu, HuTao, DIO)
-    usage: |
-      /kitgive Ganyu <bow|bud|ult> [player]
-      /kitgive HuTao <homa|pyro> [player]
-      /kitgive DIO <hand|timestop|vampire> [player]
-    aliases: [kg]
-    permission: kits.give
+  endgame:
+    description: Force end match in current world
+    usage: /endgame
+    permission: lwlogic2.endgame
 
 permissions:
-  kits.give:
-    description: Allow using /kitgive
+  lwlogic2.endgame:
     default: op

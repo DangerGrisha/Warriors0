@@ -2,6 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/LwLogic2.main.iml" filepath="$PROJECT_DIR$/.idea/modules/LwLogic2.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/org.football.warriors0.main.iml" filepath="$PROJECT_DIR$/.idea/modules/org.football.warriors0.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/warriors0.main.iml" filepath="$PROJECT_DIR$/.idea/modules/warriors0.main.iml" />
     </modules>
   </component>
