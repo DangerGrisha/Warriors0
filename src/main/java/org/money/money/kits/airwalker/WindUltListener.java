@@ -33,7 +33,7 @@ public final class WindUltListener implements Listener {
     // Slow Falling behavior while airborne (only during ult)
     // Strong/weak difference is basically amplifier; duration is refreshed constantly.
     private static final int SF_REFRESH_TICKS = 30;  // refresh buffer
-    private static final int SF_STRONG_AMP = 30;      // "very strong" slow falling (amplifier doesn't change much, but ok)
+    private static final int SF_STRONG_AMP = 15;      // "very strong" slow falling (amplifier doesn't change much, but ok)
     private static final int SF_WEAK_AMP   = 5;      // weak slow falling
 
     private final Plugin plugin;

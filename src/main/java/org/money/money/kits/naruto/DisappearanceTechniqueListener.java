@@ -17,15 +17,16 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.RayTraceResult;
+import org.bukkit.util.Vector;
 
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public final class DisappearanceTechniqueListener implements Listener {
 
-    private static final int  RADIUS = 15;           // радиус поиска точки
-    private static final int  TRIES  = 32;           // кол-во попыток подобрать безопасную точку
+    private static final long TELEPORT_DELAY_TICKS = 20L * 2; // 2 seconds delay
+    private static final double LOOK_TELEPORT_RANGE = 25.0;
     private static final long RETURN_AFTER_MS = 60_000L; // вернуть предмет через 60 сек
 
     private final Plugin plugin;
@@ -34,6 +35,7 @@ public final class DisappearanceTechniqueListener implements Listener {
 
     // когда игроку вернётся предмет
     private final Map<UUID, Long> cooldownUntilMs = new HashMap<>();
+    private final Map<UUID, Integer> pendingTpTaskId = new HashMap<>();
 
     public DisappearanceTechniqueListener(Plugin plugin) {
         this.plugin = Objects.requireNonNull(plugin);
@@ -81,14 +83,9 @@ public final class DisappearanceTechniqueListener implements Listener {
             from.getWorld().playSound(from, Sound.ITEM_CHORUS_FRUIT_TELEPORT, 0.9f, 1.35f);
         } catch (Throwable ignored) {}
 
-        // 3) телепорт
-        Location dest = pickSafeRandomLocation(p, RADIUS, TRIES);
-        if (dest == null) dest = fallbackSameSpot(p); // на всякий случай
-        p.teleportAsync(dest);
-        try {
-            dest.getWorld().spawnParticle(Particle.CLOUD, dest.clone().add(0, 0.1, 0), 16, 0.5, 0.3, 0.5, 0.02);
-            dest.getWorld().playSound(dest, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.2f);
-        } catch (Throwable ignored) {}
+        // 3) remember exact raycast point NOW and teleport there after 2s (including air/sky)
+        Location lookTarget = resolveLookTarget(p);
+        scheduleDelayedTeleport(p.getUniqueId(), lookTarget);
 
         // 4) планируем возврат предмета через 60 сек (real-time)
         long backAt = System.currentTimeMillis() + RETURN_AFTER_MS;
@@ -99,69 +96,38 @@ public final class DisappearanceTechniqueListener implements Listener {
                 RETURN_AFTER_MS, TimeUnit.MILLISECONDS);
     }
 
-    /* ---------- safe random TP ---------- */
+    /* ---------- delayed look TP ---------- */
 
-    private Location pickSafeRandomLocation(Player p, int radius, int tries) {
+    private void scheduleDelayedTeleport(UUID playerId, Location dest) {
+        Integer prev = pendingTpTaskId.remove(playerId);
+        if (prev != null) Bukkit.getScheduler().cancelTask(prev);
+
+        int tid = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            pendingTpTaskId.remove(playerId);
+            Player p = Bukkit.getPlayer(playerId);
+            if (p == null || !p.isOnline()) return;
+
+            p.teleportAsync(dest);
+            try {
+                dest.getWorld().spawnParticle(Particle.CLOUD, dest.clone().add(0, 0.1, 0), 16, 0.5, 0.3, 0.5, 0.02);
+                dest.getWorld().playSound(dest, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.2f);
+            } catch (Throwable ignored) {}
+        }, TELEPORT_DELAY_TICKS).getTaskId();
+
+        pendingTpTaskId.put(playerId, tid);
+    }
+
+    private Location resolveLookTarget(Player p) {
+        Location eye = p.getEyeLocation();
+        Vector dir = eye.getDirection().normalize();
         World w = p.getWorld();
-        Random rnd = ThreadLocalRandom.current();
 
-        int minY = w.getMinHeight() + 1;
-        int maxY = w.getMaxHeight() - 2;
-
-        Location base = p.getLocation();
-
-        for (int i = 0; i < tries; i++) {
-            int dx = rnd.nextInt(-radius, radius + 1);
-            int dy = rnd.nextInt(-radius, radius + 1);
-            int dz = rnd.nextInt(-radius, radius + 1);
-
-            int x = base.getBlockX() + dx;
-            int y = clamp(base.getBlockY() + dy, minY, maxY);
-            int z = base.getBlockZ() + dz;
-
-            Location cand = new Location(w, x + 0.5, y, z + 0.5);
-
-            Location safe = searchNearbyStandable(cand, 24);
-            if (safe != null) return safe;
+        RayTraceResult hit = w.rayTraceBlocks(eye, dir, LOOK_TELEPORT_RANGE, FluidCollisionMode.NEVER, true);
+        if (hit != null && hit.getHitPosition() != null) {
+            Vector v = hit.getHitPosition();
+            return new Location(w, v.getX(), v.getY(), v.getZ());
         }
-        return null;
-    }
-
-    /** Ищем рядом по вертикали место, где можно стоять: блок под ногами – solid, ноги/голова – воздух. */
-    private Location searchNearbyStandable(Location around, int maxVertical) {
-        World w = around.getWorld();
-        int x = around.getBlockX();
-        int y = around.getBlockY();
-        int z = around.getBlockZ();
-
-        // вниз
-        for (int dy = 0; dy <= maxVertical; dy++) {
-            int yy = y - dy;
-            if (isStandable(w, x, yy, z)) return new Location(w, x + 0.5, yy, z + 0.5);
-        }
-        // вверх
-        for (int dy = 1; dy <= maxVertical; dy++) {
-            int yy = y + dy;
-            if (isStandable(w, x, yy, z)) return new Location(w, x + 0.5, yy, z + 0.5);
-        }
-        return null;
-    }
-
-    private boolean isStandable(World w, int x, int y, int z) {
-        Block feet = w.getBlockAt(x, y, z);
-        Block head = w.getBlockAt(x, y + 1, z);
-        Block below = w.getBlockAt(x, y - 1, z);
-        // «ноги» и «голова» проходимы, блок под ногами – твёрдый и не жидкость
-        return feet.isPassable() && head.isPassable() && below.getType().isSolid() && !below.isLiquid();
-    }
-
-    private int clamp(int v, int lo, int hi) {
-        return Math.max(lo, Math.min(hi, v));
-    }
-
-    private Location fallbackSameSpot(Player p) {
-        // если ничего не нашли, вернуть на то же место (но всё равно эффекты уже проиграны)
-        return p.getLocation();
+        return eye.clone().add(dir.multiply(LOOK_TELEPORT_RANGE));
     }
 
     /* ---------- return item / join ---------- */
@@ -191,7 +157,8 @@ public final class DisappearanceTechniqueListener implements Listener {
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent e) {
-        // ничего особого не требуется; возврат по плану real-time
+        Integer tid = pendingTpTaskId.remove(e.getPlayer().getUniqueId());
+        if (tid != null) Bukkit.getScheduler().cancelTask(tid);
     }
 
     private void giveToHandOrInv(Player p, ItemStack it) {

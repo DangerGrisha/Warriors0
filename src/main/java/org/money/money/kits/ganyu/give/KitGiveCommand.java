@@ -10,7 +10,9 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import org.money.money.kits.airwalker.WindInvisListener;
 import org.money.money.kits.airwalker.WindListener;
+import org.money.money.kits.airwalker.WindSwordListener;
 import org.money.money.kits.airwalker.WindUltListener;
 import org.money.money.kits.burgerMaster.GrillPlaceListener;
 import org.money.money.kits.burgerMaster.GardenPlatformListener;
@@ -19,16 +21,25 @@ import org.money.money.kits.dio.TimeStopListener;
 import org.money.money.kits.dio.VampireListener;
 import org.money.money.kits.ganyu.listeners.GanyuBudListener;
 import org.money.money.kits.ganyu.listeners.GanyuUltListener;
+import org.money.money.kits.haohao.MaskAbility;
+import org.money.money.kits.haohao.SwordShield;
+import org.money.money.kits.opera.OperaAuraListener;
+import org.money.money.kits.opera.OperaTransformationListener;
 import org.money.money.kits.hutao.HuTaoInvisListener;
 import org.money.money.kits.hutao.HuTaoPyroListener;
 import org.money.money.kits.hutao.HuTaoBoomListener;
 import org.money.money.kits.naruto.DisappearanceTechniqueListener;
 import org.money.money.kits.naruto.NarutoRasenganListener;
 import org.money.money.kits.naruto.NarutoClonesListener;
+import org.money.money.kits.saberD.SaberDarkExcaliburListener;
+import org.money.money.kits.saberD.SaberDarkUltimateListener;
+import org.money.money.kits.saberL.SaberLightUltimateListener;
 import org.money.money.kits.uraraka.LevitationMarkListener;
 import org.money.money.kits.uraraka.UrarakaGloveListener;
 import org.money.money.kits.uraraka.UrarakaGravityListener;
 import org.money.money.kits.uraraka.UrarakaHealPostListener;
+import org.money.money.kits.saberL.SaberLightExcaliburListener;
+import org.money.money.kits.saberL.SaberLightSoulTradesListener;
 import org.bukkit.enchantments.Enchantment;
 
 import java.util.*;
@@ -56,6 +67,17 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     private final HungryMasterListener hungryMasterListener;          // BurgerMaster: hungry  <<< NEW
     private final WindListener windListener;
     private final WindUltListener windultListener;
+    private final WindSwordListener windSwordListener;
+    private final WindInvisListener windInvisListener;
+    private final SwordShield swordShield;
+    private final MaskAbility maskAbility;
+    private final OperaTransformationListener operaTransformationListener;
+    private final OperaAuraListener operaAuraListener;
+    private final SaberLightExcaliburListener saberLightExcaliburListener;
+    private final SaberLightUltimateListener saberLightUltimateListener;
+    private final SaberDarkExcaliburListener saberDarkExcaliburListener;
+    private final SaberDarkUltimateListener saberDarkUltimateListener;
+
 
     private final NamespacedKey KEY_GANYU_BOW;
     private final NamespacedKey KEY_DIO_HAND;
@@ -78,7 +100,18 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                           GrillPlaceListener grillPlacer,
                           GardenPlatformListener gardenPlatform,
                           HungryMasterListener hungryMasterListener,
-                          WindListener windListener, WindUltListener windUltListener) {              // <<< NEW
+                          WindListener windListener,
+                          WindUltListener windUltListener,
+                          WindSwordListener windSwordListener,
+                          WindInvisListener windInvisListener,
+                          SwordShield swordShield,
+                          MaskAbility maskAbility,
+                          OperaTransformationListener operaTransformationListener,
+                          OperaAuraListener operaAuraListener,
+                          SaberLightExcaliburListener saberLightExcaliburListener,
+                          SaberLightUltimateListener saberLightUltimateListener,
+                          SaberDarkExcaliburListener saberDarkExcaliburListener,
+                          SaberDarkUltimateListener saberDarkUltimateListener) {
 
         this.plugin = Objects.requireNonNull(plugin);
         this.budListener = Objects.requireNonNull(budListener);
@@ -100,9 +133,20 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.hungryMasterListener    = Objects.requireNonNull(hungryMasterListener); // <<< NEW
         this.windListener    = Objects.requireNonNull(windListener);
         this.windultListener   = Objects.requireNonNull(windUltListener);
+        this.windSwordListener   = Objects.requireNonNull(windSwordListener);
+        this.windInvisListener   = Objects.requireNonNull(windInvisListener);
+        this.swordShield = Objects.requireNonNull(swordShield);
+        this.maskAbility = Objects.requireNonNull(maskAbility);
+        this.operaTransformationListener = Objects.requireNonNull(operaTransformationListener);
+        this.operaAuraListener = Objects.requireNonNull(operaAuraListener);
+        this.saberLightExcaliburListener = Objects.requireNonNull(saberLightExcaliburListener);
+        this.saberLightUltimateListener = Objects.requireNonNull(saberLightUltimateListener);
+        this.saberDarkExcaliburListener = Objects.requireNonNull(saberDarkExcaliburListener);
+        this.saberDarkUltimateListener = Objects.requireNonNull(saberDarkUltimateListener);
 
         this.KEY_GANYU_BOW = new NamespacedKey(plugin, "ganyu_bow");
         this.KEY_DIO_HAND  = new NamespacedKey(plugin, "dio_hand");
+
     }
 
     @Override
@@ -120,16 +164,53 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Naruto <rasengan|disappear|clones> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry> [player]"); // <<< UPDATED
             sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry|sword> [player]");
-            sender.sendMessage(ChatColor.GRAY + " /" + label + " AirWalker <wind|windult> [player]");
-
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " AirWalker <wind|windult|windsword|windinvis> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " HaoHao <swordshield> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " HaoHao <mask> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " Opera <transformation> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " Opera <aura> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " SaberLight <Excalibur|Ult|Trade> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " SaberD <excaliburd|ultd> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " SaberLight souladd [amount] [player]");
             return true;
         }
 
         String hero = args[0].toLowerCase(Locale.ROOT);
         String sub  = args[1].toLowerCase(Locale.ROOT);
 
+        int soulAddAmount = 1;
         Player target;
-        if (args.length >= 3) {
+        // Special parse for SaberLight souladd:
+        // /kitgive SaberLight souladd
+        // /kitgive SaberLight souladd <player>
+        // /kitgive SaberLight souladd <amount>
+        // /kitgive SaberLight souladd <amount> <player>
+        if (("saberlight".equals(hero) || "saber".equals(hero) || "light".equals(hero)
+                || "saberd".equals(hero) || "saberdark".equals(hero) || "darksaber".equals(hero))
+                && ("souladd".equals(sub) || "addsoul".equals(sub) || "soulsadd".equals(sub))) {
+            int idx = 2;
+            if (args.length >= 3) {
+                Integer parsedAmount = parsePositiveInt(args[2]);
+                if (parsedAmount != null) {
+                    soulAddAmount = parsedAmount;
+                    idx = 3;
+                }
+            }
+
+            if (args.length > idx) {
+                target = Bukkit.getPlayerExact(args[idx]);
+                if (target == null) {
+                    sender.sendMessage(ChatColor.RED + "Игрок оффлайн: " + args[idx]);
+                    return true;
+                }
+            } else {
+                if (!(sender instanceof Player p)) {
+                    sender.sendMessage(ChatColor.RED + "Нужно указать игрока.");
+                    return true;
+                }
+                target = p;
+            }
+        } else if (args.length >= 3) {
             target = Bukkit.getPlayerExact(args[2]);
             if (target == null) {
                 sender.sendMessage(ChatColor.RED + "Игрок оффлайн: " + args[2]);
@@ -213,6 +294,11 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                         itemToGive = windultListener.makeWindUltDye();
                         pretty = "WindUlt";
                     }
+                    case "windsword", "sword" -> { itemToGive = windSwordListener.makeWindSword(); pretty = "Wind Sword"; }
+                    case "invis", "windinvis" -> {
+                        itemToGive = windInvisListener.makeInvisDye();
+                        pretty = "Invis";
+                    }
                     default -> {
                         sender.sendMessage(ChatColor.RED + "Неизвестный предмет для AirWalker: " + sub);
                         sender.sendMessage(ChatColor.GRAY + "Доступно: wind");
@@ -220,6 +306,116 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                     }
                 }
             }
+            case "haohao", "king" -> {
+                switch (sub) {
+                    case "swordshield", "shield", "sword" -> { itemToGive = swordShield.makeKingSword(); pretty = "King's Sword"; }
+                    case "mask" -> { itemToGive = maskAbility.makeYellowMask(); pretty = "Mask"; }
+                    default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для HaoHao: " + sub); return true; }
+                }
+            }
+            case "opera" -> {
+                switch (sub) {
+                    case "transformation", "transform", "horse" -> { itemToGive = operaTransformationListener.makeTransformationDye(); pretty = "transformation"; }
+                    case "aura" -> { itemToGive = operaAuraListener.makeAuraItem(); pretty = "Opera Aura"; }
+                    default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Opera: " + sub); return true; }
+                }
+            }
+            case "saberlight", "saber", "light" -> {
+                switch (sub) {
+                    case "excalibur", "sword", "shield" -> {
+                        itemToGive = saberLightExcaliburListener.makeExcalibur();
+                        pretty = "Excalibur";
+                    }
+                    case "ult", "realese" -> {
+                        itemToGive = saberLightUltimateListener.makeSoulReleaseCrossbow();
+                        pretty = "Realese";
+                    }
+                    case "soultrades" -> {
+                        if (!isSaberSoulClass(target)) {
+                            sender.sendMessage("§cTarget is not LightSaber/DarkSaber.");
+                            return true;
+                        }
+
+                        target.getInventory().addItem(SaberLightSoulTradesListener.makeSoulTradesItem());
+                        sender.sendMessage("§aGave SoulTrades to " + target.getName());
+                        target.sendMessage("§6You received §bSoulTrades§6.");
+                        return true;
+                    }
+                    case "souladd", "addsoul", "soulsadd" -> {
+                        ItemStack excalibur = findAnyExcalibur(target);
+
+                        if (excalibur == null) {
+                            sender.sendMessage(ChatColor.RED + "У игрока нет Excalibur/ExcaliburD.");
+                            return true;
+                        }
+
+                        int currentSouls = getSoulsAny(excalibur);
+                        int nextSouls = currentSouls + soulAddAmount;
+                        setSoulsAny(excalibur, nextSouls);
+                        target.updateInventory();
+
+                        sender.sendMessage(ChatColor.GREEN + "Добавлено душ: " + ChatColor.AQUA + soulAddAmount
+                                + ChatColor.GREEN + " -> " + ChatColor.WHITE + target.getName()
+                                + ChatColor.GRAY + " (итого: " + nextSouls + ")");
+                        if (!sender.equals(target)) {
+                            target.sendMessage(ChatColor.AQUA + "Вам добавили души Excalibur: +" + soulAddAmount
+                                    + ChatColor.GRAY + " (итого: " + nextSouls + ")");
+                        }
+                        return true;
+                    }
+                    default -> {
+                        sender.sendMessage(ChatColor.RED + "Неизвестный предмет для SaberLight: " + sub);
+                        return true;
+                    }
+                }
+            }
+            case "saberd", "saberdark", "darksaber" -> {
+                switch (sub) {
+                    case "excaliburd", "dexcalibur", "shield", "sword" -> {
+                        itemToGive = saberDarkExcaliburListener.makeExcalibur();
+                        pretty = "ExcaliburD";
+                    }
+                    case "ultd", "soulreleased", "ult", "release" -> {
+                        itemToGive = saberDarkUltimateListener.makeSoulReleaseCrossbow();
+                        pretty = "Soul ReleaseD";
+                    }
+                    case "soultrades" -> {
+                        if (!isSaberSoulClass(target)) {
+                            sender.sendMessage("§cTarget is not LightSaber/DarkSaber.");
+                            return true;
+                        }
+                        target.getInventory().addItem(SaberLightSoulTradesListener.makeSoulTradesItem());
+                        sender.sendMessage("§aGave SoulTrades to " + target.getName());
+                        target.sendMessage("§6You received §bSoulTrades§6.");
+                        return true;
+                    }
+                    case "souladd", "addsoul", "soulsadd" -> {
+                        ItemStack excalibur = findAnyExcalibur(target);
+                        if (excalibur == null) {
+                            sender.sendMessage(ChatColor.RED + "У игрока нет Excalibur/ExcaliburD.");
+                            return true;
+                        }
+                        int currentSouls = getSoulsAny(excalibur);
+                        int nextSouls = currentSouls + soulAddAmount;
+                        setSoulsAny(excalibur, nextSouls);
+                        target.updateInventory();
+
+                        sender.sendMessage(ChatColor.GREEN + "Добавлено душ: " + ChatColor.AQUA + soulAddAmount
+                                + ChatColor.GREEN + " -> " + ChatColor.WHITE + target.getName()
+                                + ChatColor.GRAY + " (итого: " + nextSouls + ")");
+                        if (!sender.equals(target)) {
+                            target.sendMessage(ChatColor.AQUA + "Вам добавили души Excalibur: +" + soulAddAmount
+                                    + ChatColor.GRAY + " (итого: " + nextSouls + ")");
+                        }
+                        return true;
+                    }
+                    default -> {
+                        sender.sendMessage(ChatColor.RED + "Неизвестный предмет для SaberD: " + sub);
+                        return true;
+                    }
+                }
+            }
+
 
 
             default -> { sender.sendMessage(ChatColor.RED + "Неизвестный герой: " + args[0]); return true; }
@@ -280,7 +476,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (!sender.hasPermission("kits.give")) return List.of();
 
-        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker"), args[0]);
+        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker","HaoHao","LightSaber","DarkSaber"), args[0]);
         if (args.length == 2) {
             if ("ganyu".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("bow","bud","ult"), args[1]);
             if ("hutao".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("homa","pyro","ult"), args[1]);
@@ -289,15 +485,71 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             if ("naruto".equalsIgnoreCase(args[0]))  return filter(Arrays.asList("rasengan","disappear","clones"), args[1]);
             if ("burgermaster".equalsIgnoreCase(args[0]) || "burger".equalsIgnoreCase(args[0]))
                 return filter(Arrays.asList("grill","garden","hungry","sword"), args[1]);
-            if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker"), args[0]);
-
-
+            //i dont see airwalker here for some reason idk why
+            if ("haohao".equalsIgnoreCase(args[0]) || "king".equalsIgnoreCase(args[0])) return filter(Arrays.asList("swordshield","shield","sword","mask"), args[1]);
+            if ("opera".equalsIgnoreCase(args[0])) return filter(Arrays.asList("transformation","transform","horse","aura"), args[1]);
+            if ("saberlight".equalsIgnoreCase(args[0]) || "saber".equalsIgnoreCase(args[0]) || "light".equalsIgnoreCase(args[0]))
+                return filter(Arrays.asList("excalibur","ult","soultrades","souladd"), args[1]);
+            if ("saberd".equalsIgnoreCase(args[0]) || "saberdark".equalsIgnoreCase(args[0]) || "darksaber".equalsIgnoreCase(args[0]))
+                return filter(Arrays.asList("excaliburd","ultd","soultrades","souladd"), args[1]);
         }
         if (args.length == 3) {
+            if (("saberlight".equalsIgnoreCase(args[0]) || "saber".equalsIgnoreCase(args[0]) || "light".equalsIgnoreCase(args[0]))
+                    && ("souladd".equalsIgnoreCase(args[1]) || "addsoul".equalsIgnoreCase(args[1]) || "soulsadd".equalsIgnoreCase(args[1]))) {
+                return filter(Arrays.asList("1","2","3","5","10"), args[2]);
+            }
             List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
             return filter(names, args[2]);
         }
+        if (args.length == 4) {
+            if (("saberlight".equalsIgnoreCase(args[0]) || "saber".equalsIgnoreCase(args[0]) || "light".equalsIgnoreCase(args[0]))
+                    && ("souladd".equalsIgnoreCase(args[1]) || "addsoul".equalsIgnoreCase(args[1]) || "soulsadd".equalsIgnoreCase(args[1]))) {
+                List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
+                return filter(names, args[3]);
+            }
+        }
         return List.of();
+    }
+
+    private static Integer parsePositiveInt(String raw) {
+        try {
+            int n = Integer.parseInt(raw);
+            return n > 0 ? n : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private boolean isSaberSoulClass(Player p) {
+        return p.getScoreboardTags().contains("LightSaber") || p.getScoreboardTags().contains("DarkSaber");
+    }
+
+    private ItemStack findAnyExcalibur(Player p) {
+        for (ItemStack it : p.getInventory().getContents()) {
+            if (it == null) continue;
+            if (saberLightExcaliburListener.isExcalibur(it) || saberDarkExcaliburListener.isExcalibur(it)) return it;
+        }
+        return null;
+    }
+
+    private int getSoulsAny(ItemStack excalibur) {
+        if (saberLightExcaliburListener.isExcalibur(excalibur)) {
+            return saberLightExcaliburListener.getSouls(excalibur);
+        }
+        if (saberDarkExcaliburListener.isExcalibur(excalibur)) {
+            return saberDarkExcaliburListener.getSouls(excalibur);
+        }
+        return 0;
+    }
+
+    private void setSoulsAny(ItemStack excalibur, int souls) {
+        if (saberLightExcaliburListener.isExcalibur(excalibur)) {
+            saberLightExcaliburListener.updateExcaliburSouls(excalibur, souls);
+            return;
+        }
+        if (saberDarkExcaliburListener.isExcalibur(excalibur)) {
+            saberDarkExcaliburListener.updateExcaliburSouls(excalibur, souls);
+        }
     }
 
     private static List<String> filter(List<String> base, String token) {

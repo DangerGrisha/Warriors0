@@ -20,6 +20,8 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -29,20 +31,23 @@ public final class NarutoRasenganListener implements Listener {
     /* =================== Константы =================== */
 
     // КД возврата синего красителя после активации (real-time)
-    private static final long COOLDOWN_MS = 90_000L; // 1.5 мин
+    private static final long COOLDOWN_MS = 25_000L; // 1.5 мин
 
     // Урон от высоты падения (добавляется к урону ивента удара)
-    private static final double BASE_DAMAGE   = 6.0;   // 2 сердца базой
+    private static final double BASE_DAMAGE   = 10.0;   // 2 сердца базой
     private static final double PER_BLOCK_DMG = 1.2;   // +1 сердца за 2 блок
-    private static final double MAX_DAMAGE    = 50;  // хард-кап доп. урона
+    private static final double MAX_DAMAGE    = 70;  // хард-кап доп. урона
 
     // «Сила» удара (масштаб нокбэка) от высоты падения
     private static final float BASE_POWER      = 2.0f;
     private static final float POWER_PER_BLOCK = 0.2f;
     private static final float MAX_POWER       = 20.0f;
 
-    // «Ядро» должно исчезнуть через 10 секунд + обратный отсчёт за 3/2/1
-    private static final long CORE_TTL_TICKS = 20L * 10;
+    // «Ядро» должно исчезнуть через 15 секунд + обратный отсчёт за 3/2/1
+    private static final long CORE_TTL_TICKS = 20L * 15;
+    // Jump Boost III during Rasengan active window
+    private static final int RASENGAN_JUMP_TICKS = 20 * 15;
+    private static final int RASENGAN_JUMP_AMPLIFIER = 2; // III (zero-based)
 
     /* =================== Поля =================== */
 
@@ -121,6 +126,14 @@ public final class NarutoRasenganListener implements Listener {
             hand.setAmount(amt - 1);
             p.getInventory().setItemInMainHand(makeRasenganCore());
         }
+
+        // Give mobility window while Rasengan core is active (15s).
+        p.addPotionEffect(new PotionEffect(
+                PotionEffectType.JUMP_BOOST,
+                RASENGAN_JUMP_TICKS,
+                RASENGAN_JUMP_AMPLIFIER,
+                false, true, true
+        ));
 
         // возврат красителя через 1.5 мин (real-time)
         long backAt = System.currentTimeMillis() + COOLDOWN_MS;
