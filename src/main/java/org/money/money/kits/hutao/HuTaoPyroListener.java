@@ -20,6 +20,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.money.money.combat.ElementalReactions;
+import org.money.money.session.KitSession;
 
 import java.util.*;
 
@@ -91,7 +92,7 @@ public final class HuTaoPyroListener implements Listener {
 
         // вернём предмет через 60с
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!p.isOnline()) return;
+            if (!p.isOnline() || !KitSession.isInGame(p)) return;
             p.getInventory().addItem(makePyroStatusDye());
             p.sendMessage("§6Pyro Status§7 is ready again!");
             p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.6f);

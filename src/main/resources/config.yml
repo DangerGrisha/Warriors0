@@ -1,0 +1,139 @@
+# ===== Warriors0 =====
+
+# Миры-лобби. В них способности НЕ возвращаются по кулдауну, а при входе в такой мир
+# игрок очищается от эффектов/сущностей/предметов способностей.
+#
+# Команды (scoreboard team) и так используются как сигнал "в игре" (на сервере они
+# назначаются только на время матча), поэтому даже с пустым списком возвраты не сработают
+# в лобби. Но указать имя лобби-мира надёжнее (и обязательно для FFA-режимов без команд).
+#
+# Укажите РЕАЛЬНОЕ имя вашего лобби-мира (как папка мира на сервере):
+lobby-worlds:
+  - lobby
+
+# ===== Ishigava =====
+# Mirror Clones — два Citizens-клона по бокам повторяют движение/предмет 1-в-1; F выбирает
+# слот 1·2·3 и через момент меняешься местами с клоном (свой слот = финт). Слот 2 — центр (аура).
+ishigava:
+  clones:
+    durationSeconds: 40
+    cooldownSeconds: 120
+    cloneHealth: 6.0        # ~3 сердечка
+    spacing: 2.6            # расстояние от центра до слота (клоны разнесены шире)
+    skinName: _Heugo        # ник игрока, чей скин надевают клоны (не скин самого Ишигавы)
+    # Управление: F выбирает слот 1·2·3, ПКМ подтверждает замену.
+
+# ===== TimeWalker =====
+# Класс "временной бегун": рывок в будущее, идеальное рассечение, разгон времени и
+# хроно-мираж. Все значения читаются с дефолтами — секцию можно не указывать.
+timewalker:
+  # Future Run / Пробег по будущему (ПКМ по часам "Future Run")
+  run:
+    cooldown-seconds: 45    # КД способности
+    dash-ticks: 20          # ~1с начального ускорения (рывок)
+    total-ticks: 160        # через 8с от активации — возврат в стартовую точку
+    dash-speed-level: 60    # уровень Speed во время рывка (телепорт-режим)
+  # Perfect Sever / Идеальное рассечение (ПКМ мечом "Perfect Sever")
+  slash:
+    cooldown-seconds: 8
+    iframe-ticks: 8        # неуязвимость во время слеша (~0.4с)
+    forward-launch: 0.6    # рывок вперёд вместе со слешем (короче в ~2 раза)
+    range: 6.0             # дальность слеша (блоки) — короче в 2 раза
+    base-damage: 5.0
+    speed-multiplier: 13.5 # finalDamage = base + горизСкорость(бл/тик)*mult (x1.5 к урону за скорость)
+    min-damage: 5.0
+    max-damage: 20.0       # подняли потолок, чтобы прибавка за скорость не упиралась в кап
+  # Momentum Drive / Разгон времени (ПКМ по сахару "Momentum Drive" — вкл/выкл)
+  momentum:
+    max-level: 8           # до Speed VIII
+    seconds-per-level: 0.9 # сколько секунд прямого бега на +1 уровень (чуть быстрее)
+    turn-reset-degrees: 60 # резкий поворот больше этого угла сбрасывает разгон
+    min-move-speed: 0.04   # ниже этой скорости (бл/тик) считаем, что игрок встал
+    # При включённом моментуме урон от падения уменьшается, а сам удар о землю
+    # превращается в моментум: чем сильнее падение — тем больше разгон.
+    fall-damage-multiplier: 0.5         # множитель урона от падения (0.5 = в 2 раза меньше)
+    fall-momentum-ticks-per-damage: 4.0 # +тиков разгона за каждую единицу урона от падения
+  # Chrono Mirage: Thousand Cuts / Хроно-Мираж (ПКМ по оку "Chrono Mirage")
+  ult:
+    radius: 36.0           # круг ульты (ещё x2 — очень большой домен)
+    duration-seconds: 6
+    damage-per-tick: 4.0   # урон каждый тик (бьёт ощутимо: ~4 урона каждые 0.5с)
+    tick-period: 10        # урон каждые 0.5с
+    clone-count: 6         # клонов: NPC из Citizens (если установлен) + частичные афтеримиджи
+    clone-skin: seirah515  # ник игрока, чей скин надевают NPC-клоны
+    cooldown-seconds: 60
+    self-speed-amplifier: 1       # бафф скорости кастеру внутри ульты
+    self-resistance-amplifier: 0  # >=0 — даёт Resistance этого уровня; убрать = отрицательное
+
+# ===== Blastborn =====
+# Класс-подрывник: шкала Self-Destruction (XP bar), взрывные перчатки (2 режима по F),
+# ударная граната и ульта Phoenix Detonator. Все значения читаются с дефолтами.
+classes:
+  blastborn:
+    # Любой взрыв откидывает САМОГО Bakugo в N раз сильнее, чем остальных (мобильность).
+    selfKnockbackMultiplier: 2.25
+    selfDestruction:
+      max: 100
+      decayIntervalTicks: 10        # шкала падает каждые 0.5с
+      decayAmount: 1                # на 1 очко (=> 2 очка/сек)
+      gainPerGloveExplosion: 10
+      overloadDelayTicks: 20        # 1с предупреждения перед детонацией на 100
+      overloadExplosionRadius: 5.5
+      overloadBlockBreakRadius: 4.0
+      overloadDamage: 28.0                  # урон самоуничтожения по другим (x2)
+      overloadKnockback: 2.0
+      overloadKillsSelf: true              # на 100 взрыв убивает самого Bakugo (если нет тотема)
+      overloadTotemDamageMultiplier: 0.5   # если тотем сработал — взрыв слабее на других
+    gloves:
+      switchWithF: true
+      wallBlast:                    # режим A: рикошет от стены (откид, без урона/ломки)
+        range: 4.0
+        radius: 3.0
+        damage: 0.0
+        knockback: 1.6
+        cooldownTicks: 8             # ~0.4с
+        breakBlocks: false
+      airBurst:                     # режим B: взрыв в воздухе (урон всем + себе)
+        distance: 3.0
+        radius: 3.2
+        damage: 6.0
+        selfDamageMultiplier: 0.75
+        knockback: 1.8
+        cooldownTicks: 8            # ~0.4с
+        breakBlocks: false
+        requireClearAirPath: true
+    grenade:
+      cooldownTicks: 600            # 30с
+      primeTicks: 20                # ~1с подготовки со звуком
+      projectileSpeed: 1.9          # сила полёта обычной гранаты
+      explosionRadius: 4.0
+      blockBreakRadius: 3.0
+      damage: 12.0                   # урон гранаты больше
+      knockback: 1.5
+      friendlyFire: false
+      selfDestructionGain: 0
+    # Sweat Machine Gun — очередь гранат-«фаерболов», летят прямо, слабее обычной гранаты
+    machineGun:
+      count: 20                      # сколько патронов в очереди
+      fireIntervalTicks: 2           # шаг между выстрелами
+      projectileSpeed: 2.2
+      spread: 0.12                   # небольшой разброс в стороны
+      explosionRadius: 2.5
+      damage: 6.0                    # ~в 2 раза слабее обычной гранаты
+      knockback: 0.9
+      cooldownTicks: 1000            # 50с
+      maxLifeTicks: 40               # пуля живёт максимум 2с
+      breakBlocks: false
+      selfDestructionGain: 0
+      allowDuringUltimate: true
+      # (см. cooldownTicks выше — 1000 = 50с)
+    ultimate:
+      cooldownTicks: 2400           # 2 минуты
+      durationTicks: 200            # 10с
+      finalExplosionRadius: 8.0     # взрыв ульты сильнее
+      blockBreakRadius: 5.0
+      damage: 24.0                  # больше урона
+      knockback: 3.5               # сильнее откидывает
+      handBlastGainDuringUltimate: 0
+      allowGrenadeDuringUltimate: false
+      returnToOriginalLocation: true

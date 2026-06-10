@@ -28,10 +28,11 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.money.money.session.KitResettable;
 
 import java.util.*;
 
-public final class HuTaoInvisListener implements Listener {
+public final class HuTaoInvisListener implements Listener, KitResettable {
     private final Plugin plugin;
 
     // PDC keys
@@ -136,6 +137,9 @@ public final class HuTaoInvisListener implements Listener {
     /* страховки */
     @EventHandler public void onQuit(PlayerQuitEvent e)   { stopInvis(e.getPlayer(), true); }
     @EventHandler public void onDeath(PlayerDeathEvent e) { stopInvis(e.getEntity(), false); }
+
+    /** Конец игры / вход в лобби — снять невидимость и вернуть исходный меч/тотем. */
+    @Override public void resetPlayer(Player player) { stopInvis(player, true); }
 
     /* ===================== Core logic ===================== */
 

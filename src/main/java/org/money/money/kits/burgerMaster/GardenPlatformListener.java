@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  */
 public final class GardenPlatformListener implements Listener {
 
-    private static final long RETURN_DELAY_MS = 150_000L; // 2.5 мин real-time
+    private static final long RETURN_DELAY_MS = 60_000L; // 1 мин real-time (кулдаун возврата)
 
     private final Plugin plugin;
     private final NamespacedKey KEY_ITEM; // маркер нашего блока-предмета

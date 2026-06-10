@@ -115,79 +115,43 @@ public final class SaberDarkUltimateListener implements Listener {
         if(!isSoulRelease(p.getInventory().getItemInMainHand())) return;
         e.setCancelled(true);
 
-        // DEBUG 1: event fired
-        p.sendMessage("§7[ULT-DBG] interact fired | action=" + action + " | hand=" + e.getHand());
-
-
-        // DEBUG 1: event fired
-        p.sendMessage("§7[ULT-DBG] interact fired | action=" + action + " | hand=" + e.getHand());
-
         ItemStack hand = e.getItem();
-        ItemStack main = p.getInventory().getItemInMainHand();
-        ItemStack off  = p.getInventory().getItemInOffHand();
 
-        // DEBUG 2: what items are seen
-        p.sendMessage("§7[ULT-DBG] e.getItem=" + itemDebug(hand));
-        p.sendMessage("§7[ULT-DBG] main=" + itemDebug(main));
-        p.sendMessage("§7[ULT-DBG] off =" + itemDebug(off));
-
-        // DEBUG 3: soul checks
         boolean soulHand = isSoulRelease(hand);
-        boolean soulMain = isSoulRelease(main);
-        boolean soulOff  = isSoulRelease(off);
-        p.sendMessage("§7[ULT-DBG] soul? hand=" + soulHand + " main=" + soulMain + " off=" + soulOff);
-
         if (!soulHand) {
-            p.sendMessage("§c[ULT-DBG] STOP: e.getItem() is not Soul ReleaseD");
             return;
         }
 
         e.setCancelled(true);
-        p.sendMessage("§a[ULT-DBG] passed Soul ReleaseD check");
 
         if (!isSaberDark(p)) {
-            p.sendMessage("§c[ULT-DBG] STOP: no DarkSaber tag");
             p.sendActionBar(Component.text("§cOnly DarkSaber can use this."));
             return;
         }
-        p.sendMessage("§a[ULT-DBG] passed DarkSaber tag");
 
         if (activeCasts.containsKey(p.getUniqueId())) {
-            p.sendMessage("§c[ULT-DBG] STOP: already casting");
             p.sendActionBar(Component.text("§eAlready casting..."));
             return;
         }
-        p.sendMessage("§a[ULT-DBG] passed active cast check");
 
         if (isUltOnCooldown(p)) {
             long ms = ultCooldownUntil.get(p.getUniqueId()) - System.currentTimeMillis();
-            p.sendMessage("§c[ULT-DBG] STOP: ult cooldown " + ms + "ms left");
             p.sendActionBar(Component.text("§cUltimate cooldown: §f" + Math.max(1, (ms / 1000)) + "s"));
             return;
         }
-        p.sendMessage("§a[ULT-DBG] passed ult cooldown");
-
-
 
         ItemStack exc = findExcaliburInInventory(p);
         if (exc == null) {
             p.sendActionBar(Component.text("§cExcalibur not found in inventory."));
             return;
         }
-        p.sendMessage("§a[ULT-DBG] passed ExcaliburD main-hand check");
-
-        p.sendMessage("§7[ULT-DBG] exc in main = " + itemDebug(exc));
-        p.sendMessage("§7[ULT-DBG] isExcalibur(main) = " + excalibur.isExcalibur(exc));
 
         int souls = excalibur.getSouls(exc);
-        p.sendMessage("§7[ULT-DBG] souls=" + souls + " required=" + SOUL_COST);
 
         if (souls < SOUL_COST) {
-            p.sendMessage("§c[ULT-DBG] STOP: not enough souls");
             p.sendActionBar(Component.text("§cNeed " + SOUL_COST + " souls. §7(" + souls + "/" + SOUL_COST + ")"));
             return;
         }
-        p.sendMessage("§a[ULT-DBG] passed soul count");
 
         // Lock aim NOW (important)
         Location eye = p.getEyeLocation().clone();
@@ -197,14 +161,11 @@ public final class SaberDarkUltimateListener implements Listener {
 
         // Ray trace target using locked direction
         Location target = findTargetPoint(p, eye, lockedDir, BEAM_MAX_RANGE);
-        p.sendMessage("§7[ULT-DBG] target=" + target.getBlockX() + "," + target.getBlockY() + "," + target.getBlockZ());
 
         // Consume souls immediately (anti-abuse)
         boolean consumed = consumeSoulsFromInventoryExcalibur(p, SOUL_COST);
-        p.sendMessage("§7[ULT-DBG] consume result=" + consumed);
 
         if (!consumed) {
-            p.sendMessage("§c[ULT-DBG] STOP: consume failed");
             p.sendActionBar(Component.text("§cFailed to consume souls."));
             return;
         }
@@ -221,7 +182,6 @@ public final class SaberDarkUltimateListener implements Listener {
         );
         activeCasts.put(p.getUniqueId(), state);
 
-        p.sendMessage("§a[ULT-DBG] STARTING CHARGE");
         startChargeAndBeam(p, state);
     }
     private ItemStack findExcaliburInInventory(Player p) {
@@ -246,8 +206,6 @@ public final class SaberDarkUltimateListener implements Listener {
         if (e.getProjectile() != null && e.getProjectile().isValid()) {
             e.getProjectile().remove();
         }
-
-        p.sendMessage("§8[ULT-DBG] Crossbow shot cancelled (Soul ReleaseD).");
     }
 
     private boolean consumeSoulsFromInventoryExcalibur(Player p, int cost) {

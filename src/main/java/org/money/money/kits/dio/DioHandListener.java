@@ -1,6 +1,7 @@
 package org.money.money.kits.dio;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.entity.ArmorStand;
@@ -10,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.*;
@@ -52,6 +54,11 @@ public final class DioHandListener implements Listener {
 
     private static final double PUNCH_RANGE        = 1.3;
     private static final double PUNCH_DAMAGE       = 5; // половинка сердца
+    private static final double HAND_HIT_DAMAGE    = 3.0; // урон обычного удара мечом-«рукой» (было 7 у алмазного меча)
+
+    // ===== ломаемый стенд =====
+    private static final double STAND_MAX_HP    = 30.0;    // ~5 заряженных ударов алмазным мечом
+    private static final long   STAND_DISABLE_MS = 60_000L; // после поломки стенд недоступен 60с
 
     // урон-фоллбэк
     private static final boolean TRUE_DAMAGE_FALLBACK = true;
@@ -70,6 +77,8 @@ public final class DioHandListener implements Listener {
     private final Map<UUID, BukkitTask> followLoops = new HashMap<>();
     private final Map<UUID, BukkitTask> dashLoops   = new HashMap<>();
     private final Map<UUID, Long>       anchorUntil = new HashMap<>();
+    private final Map<UUID, Double>     standHp     = new HashMap<>(); // текущее «невидимое» HP стенда
+    private final Map<UUID, Long>       standDisabledUntil = new HashMap<>(); // лок после поломки
 
     public DioHandListener(Plugin plugin) {
         this.plugin = Objects.requireNonNull(plugin);
@@ -132,13 +141,19 @@ public final class DioHandListener implements Listener {
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent e)  {
         log("onQuit " + e.getPlayer().getName());
-        despawnStand(e.getPlayer().getUniqueId());
+        UUID id = e.getPlayer().getUniqueId();
+        despawnStand(id);
+        standHp.remove(id);
+        standDisabledUntil.remove(id);
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onDeath(PlayerDeathEvent e){
         log("onDeath " + e.getEntity().getName());
-        despawnStand(e.getEntity().getUniqueId());
+        UUID id = e.getEntity().getUniqueId();
+        despawnStand(id);
+        standHp.remove(id);            // после смерти стенд возродится с полным HP
+        standDisabledUntil.remove(id); // и без лока
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
@@ -177,6 +192,13 @@ public final class DioHandListener implements Listener {
         Player p = e.getPlayer();
         if (!isHandSword(p.getInventory().getItemInMainHand())) return;
 
+        if (isStandDisabled(p.getUniqueId())) {
+            long left = (standDisabledUntil.get(p.getUniqueId()) - System.currentTimeMillis()) / 1000 + 1;
+            p.sendActionBar(Component.text("Стенд сломан: " + left + "с", NamedTextColor.RED));
+            p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.6f, 0.6f);
+            return;
+        }
+
         ArmorStand st = stands.get(p.getUniqueId());
         if (st == null || !st.isValid()) {
             log("onUse: ensureStand (none present) for " + p.getName());
@@ -196,6 +218,8 @@ public final class DioHandListener implements Listener {
     private void reevaluateStand(Player p) {
         UUID id = p.getUniqueId();
 
+        if (isStandDisabled(id)) { despawnStand(id); return; } // сломан — не призываем
+
         if (dashLoops.containsKey(id) || isAnchored(p)) {
             log("reevaluate(" + p.getName() + "): skip (dash/anchor active)");
             return;
@@ -213,6 +237,7 @@ public final class DioHandListener implements Listener {
     }
 
     private void ensureStand(Player p) {
+        if (isStandDisabled(p.getUniqueId())) return; // стенд сломан — не призываем
         ArmorStand existing = stands.get(p.getUniqueId());
         if (existing != null && existing.isValid()) {
             return;
@@ -220,6 +245,7 @@ public final class DioHandListener implements Listener {
         Location spawn = offsetBehindRight(p);
         ArmorStand as = spawnStand(spawn, p);
         stands.put(p.getUniqueId(), as);
+        standHp.putIfAbsent(p.getUniqueId(), STAND_MAX_HP); // HP сохраняется между свапами; полное только при поломке/смерти
         log("ensureStand: spawned at " + fmt(spawn) + " for " + p.getName());
     }
 
@@ -230,6 +256,7 @@ public final class DioHandListener implements Listener {
         log("startFollowLoop for " + p.getName());
         BukkitTask t = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!p.isOnline() || p.isDead()) { log("follow: owner offline/dead -> despawn"); despawnStand(id); return; }
+            if (isStandDisabled(id)) { despawnStand(id); return; } // сломан — убираем и стопаем
             if (dashLoops.containsKey(id) || isAnchored(p)) return;
 
             if (!isHoldingHand(p)) { log("follow: not holding hand anymore -> despawn"); despawnStand(id); return; }
@@ -402,6 +429,108 @@ public final class DioHandListener implements Listener {
 
     /* ====== урон ====== */
 
+    // Обычный удар мечом-«рукой»: фиксируем урон 3 (вместо ванильных 7 у алмазного меча)
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
+    public void onHandMeleeHit(EntityDamageByEntityEvent e) {
+        if (e.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
+        if (!(e.getDamager() instanceof Player p)) return;
+        if (!isHandSword(p.getInventory().getItemInMainHand())) return;
+        e.setDamage(HAND_HIT_DAMAGE);
+    }
+
+    /* ====== ломаемый стенд ====== */
+
+    private boolean isStandDisabled(UUID id) {
+        Long until = standDisabledUntil.get(id);
+        return until != null && until > System.currentTimeMillis();
+    }
+
+    /** Все удары по нашему стенду: ванильный урон/ломание/откидыш гасим, ведём кастомное HP. */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
+    public void onStandHit(EntityDamageByEntityEvent e) {
+        if (!(e.getEntity() instanceof ArmorStand as)) return;
+        var pdc = as.getPersistentDataContainer();
+        String ownerStr = pdc.get(KEY_OWNER, PersistentDataType.STRING);
+        if (ownerStr == null || !pdc.has(KEY_STAND, PersistentDataType.BYTE)) return;
+
+        // это наш стенд — полностью гасим ванильную обработку (урон, поломку, knockback)
+        e.setCancelled(true);
+
+        if (!(e.getDamager() instanceof Player attacker)) return;
+
+        UUID ownerId;
+        try { ownerId = UUID.fromString(ownerStr); } catch (Exception ex) { return; }
+        if (attacker.getUniqueId().equals(ownerId)) return; // владелец не ломает свой стенд
+
+        Player owner = Bukkit.getPlayer(ownerId);
+        if (owner != null && isTeammate(owner, attacker)) return; // тиммейты тоже не ломают
+
+        double dmg = Math.max(1.0, e.getDamage());
+        double hp = standHp.getOrDefault(ownerId, STAND_MAX_HP) - dmg;
+
+        as.getWorld().playSound(as.getLocation(), Sound.ENTITY_IRON_GOLEM_HURT, 0.7f, 1.3f);
+        as.getWorld().spawnParticle(Particle.CRIT, as.getLocation().clone().add(0, 1.0, 0), 8, 0.3, 0.5, 0.3, 0.0);
+
+        if (hp <= 0.0) {
+            breakStand(ownerId, attacker);
+        } else {
+            standHp.put(ownerId, hp);
+            attacker.sendActionBar(Component.text("Стенд: " + (int) Math.ceil(hp) + "/" + (int) STAND_MAX_HP + " HP",
+                    NamedTextColor.YELLOW));
+        }
+    }
+
+    /** Враги не должны снимать броню со стенда правым кликом. */
+    @EventHandler(ignoreCancelled = true)
+    public void onStandManipulate(PlayerArmorStandManipulateEvent e) {
+        var pdc = e.getRightClicked().getPersistentDataContainer();
+        if (pdc.has(KEY_STAND, PersistentDataType.BYTE)) e.setCancelled(true);
+    }
+
+    /** Не-игровой урон (огонь/лава/взрыв/падение) стенд не берёт — ломать могут только игроки. */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
+    public void onStandEnvDamage(EntityDamageEvent e) {
+        if (e instanceof EntityDamageByEntityEvent) return; // удары игроков — в onStandHit
+        if (!(e.getEntity() instanceof ArmorStand as)) return;
+        if (as.getPersistentDataContainer().has(KEY_STAND, PersistentDataType.BYTE)) e.setCancelled(true);
+    }
+
+    private void breakStand(UUID ownerId, Player breaker) {
+        ArmorStand st = stands.get(ownerId);
+        Location loc = (st != null && st.isValid()) ? st.getLocation().clone() : null;
+
+        despawnStand(ownerId);              // снимает стенд + follow/dash/anchor
+        standHp.remove(ownerId);            // после кулдауна стенд возродится с полным HP
+        standDisabledUntil.put(ownerId, System.currentTimeMillis() + STAND_DISABLE_MS);
+
+        if (loc != null && loc.getWorld() != null) {
+            World w = loc.getWorld();
+            w.playSound(loc, Sound.ENTITY_ITEM_BREAK, 1.0f, 0.8f);
+            w.playSound(loc, Sound.BLOCK_ANVIL_LAND, 0.8f, 1.2f);
+            w.spawnParticle(Particle.EXPLOSION, loc.clone().add(0, 1.0, 0), 1);
+            w.spawnParticle(Particle.CLOUD, loc.clone().add(0, 1.0, 0), 20, 0.4, 0.6, 0.4, 0.02);
+        }
+
+        Player owner = Bukkit.getPlayer(ownerId);
+        if (owner != null && owner.isOnline()) {
+            owner.sendMessage(Component.text("Ваш стенд сломан! Недоступен 60 секунд.", NamedTextColor.RED));
+            owner.playSound(owner.getLocation(), Sound.ENTITY_WITHER_HURT, 0.7f, 1.0f);
+        }
+        if (breaker != null && breaker.isOnline()) {
+            breaker.sendMessage(Component.text("Вы сломали стенд Дио!", NamedTextColor.GREEN));
+        }
+
+        // авто-восстановление через минуту (если игрок снова держит «руку»)
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Player o = Bukkit.getPlayer(ownerId);
+            if (o == null || !o.isOnline()) return;
+            if (isHoldingHand(o)) {
+                reevaluateStand(o);
+                o.sendMessage(Component.text("Стенд восстановлен.", NamedTextColor.AQUA));
+            }
+        }, STAND_DISABLE_MS / 50L);
+    }
+
     private void applyPunch(Player owner, LivingEntity target, double amount) {
         try { target.setNoDamageTicks(0); } catch (Throwable ignored) {}
 
@@ -466,8 +595,9 @@ public final class DioHandListener implements Listener {
     private ArmorStand spawnStand(Location loc, Player owner) {
         return loc.getWorld().spawn(loc, ArmorStand.class, s -> {
             s.setInvisible(true);
-            s.setMarker(true);
-            s.setInvulnerable(true);
+            s.setMarker(false);       // нужен хитбокс, чтобы стенд можно было бить
+            s.setInvulnerable(false); // урон ловим в onStandHit и гасим вручную (кастомное HP)
+            s.setCollidable(false);   // но без физического отталкивания владельца
             s.setGravity(false);
             s.setArms(true);
             s.setBasePlate(false);

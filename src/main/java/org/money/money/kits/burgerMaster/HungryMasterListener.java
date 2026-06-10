@@ -17,6 +17,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.entity.Player;
+import org.money.money.session.KitSession;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -195,6 +196,7 @@ public final class HungryMasterListener implements Listener {
     private void giveBackIfMissing(UUID id) {
         Player p = Bukkit.getPlayer(id);
         if (p == null || !p.isOnline()) return;
+        if (!KitSession.isInGame(p)) return; // игра кончилась — не выдаём в лобби
 
         // уже есть?
         for (ItemStack it : p.getInventory().getContents()) {

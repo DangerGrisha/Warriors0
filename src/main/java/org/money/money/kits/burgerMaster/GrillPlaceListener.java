@@ -24,6 +24,8 @@ import java.util.Objects;
  */
 public final class GrillPlaceListener implements Listener {
 
+    private static final long RETURN_DELAY_MS = 60_000L; // 1 мин real-time — кулдаун возврата предмета гриля
+
     private final Plugin plugin;
     private final GrillManager grillManager;
     private final NamespacedKey KEY_GRILL_ITEM;
@@ -72,6 +74,44 @@ public final class GrillPlaceListener implements Listener {
             w.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, baseLoc.toCenterLocation().add(0, 0.7, 0), 6, 0.2, 0.2, 0.2, 0.01);
             w.playSound(baseLoc.toCenterLocation(), Sound.BLOCK_CAMPFIRE_CRACKLE, 0.9f, 1.0f);
         });
+
+        // кулдаун: вернуть предмет гриля владельцу через 1 минуту (если у него его ещё нет)
+        final java.util.UUID id = owner.getUniqueId();
+        Bukkit.getAsyncScheduler().runDelayed(
+                plugin,
+                t -> Bukkit.getScheduler().runTask(plugin, () -> giveBackGrillIfMissing(id)),
+                RETURN_DELAY_MS,
+                java.util.concurrent.TimeUnit.MILLISECONDS
+        );
+    }
+
+    /* ===================== ВОЗВРАТ ПРЕДМЕТА (кулдаун) ===================== */
+
+    private void giveBackGrillIfMissing(java.util.UUID id) {
+        Player p = Bukkit.getPlayer(id);
+        if (p == null || !p.isOnline()) return;
+        if (playerHasGrillItem(p)) return; // уже есть — второй не даём
+
+        ItemStack item = makeGrillBlock();
+        giveToHandOrInv(p, item);
+        p.playSound(p.getLocation(), Sound.UI_TOAST_IN, 0.7f, 1.2f);
+    }
+
+    private boolean playerHasGrillItem(Player p) {
+        for (ItemStack it : p.getInventory().getContents()) {
+            if (isOurGrillItem(it)) return true;
+        }
+        return false;
+    }
+
+    private void giveToHandOrInv(Player p, ItemStack it) {
+        ItemStack hand = p.getInventory().getItemInMainHand();
+        if (hand == null || hand.getType() == Material.AIR) {
+            p.getInventory().setItemInMainHand(it);
+        } else {
+            var left = p.getInventory().addItem(it);
+            if (!left.isEmpty()) p.getWorld().dropItemNaturally(p.getLocation(), left.values().iterator().next());
+        }
     }
 
     /** ПКМ по костру: если это наш гриль — открыть меню (только владельцу). */

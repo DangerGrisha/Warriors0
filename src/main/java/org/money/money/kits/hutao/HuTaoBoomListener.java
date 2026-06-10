@@ -19,6 +19,7 @@ import org.bukkit.scheduler.BukkitTask;
 // ▲ элементалки
 import org.money.money.combat.ElementalReactions;
 import org.money.money.combat.ElementalReactions.Element;
+import org.money.money.session.KitSession;
 
 public final class HuTaoBoomListener implements Listener {
 
@@ -77,7 +78,7 @@ public final class HuTaoBoomListener implements Listener {
 
         // вернём через 2 минуты
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (p.isOnline()) {
+            if (p.isOnline() && KitSession.isInGame(p)) {
                 p.getInventory().addItem(makeBoomDye());
                 p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.6f);
                 p.sendMessage("§cBOOM§7 is ready again!");

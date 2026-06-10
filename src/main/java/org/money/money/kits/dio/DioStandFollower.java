@@ -15,10 +15,11 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.money.money.session.KitResettable;
 
 import java.util.*;
 
-public final class DioStandFollower implements Listener {
+public final class DioStandFollower implements Listener, KitResettable {
 
     private final Plugin plugin;
     private final NamespacedKey KEY_STAND;
@@ -183,6 +184,13 @@ public final class DioStandFollower implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         removeStandFor(e.getPlayer().getUniqueId());
+    }
+
+    /** Конец игры / вход в лобби: снять тег DIO (чтобы verify-цикл не вернул стенд) и убрать стенд. */
+    @Override
+    public void resetPlayer(Player player) {
+        player.removeScoreboardTag("DIO");
+        removeStandFor(player.getUniqueId());
     }
 
     // на выключении плагина вызови это из onDisable(), чтобы все стенды убрались

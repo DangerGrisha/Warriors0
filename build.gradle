@@ -8,6 +8,8 @@ version = '0.1-beta'
 repositories {
     mavenCentral()
     maven { url = "https://repo.papermc.io/repository/maven-public/" }
+    maven { url = "https://repo.dmulloy2.net/repository/public/" } // ProtocolLib
+    maven { url = "https://maven.citizensnpcs.co/repo" }            // Citizens (NPC-клоны TimeWalker)
 }
 
 dependencies {
@@ -17,8 +19,51 @@ dependencies {
     compileOnly platform("net.kyori:adventure-bom:4.24.0")
     compileOnly "net.kyori:adventure-api"
     compileOnly "net.kyori:adventure-text-serializer-plain"
+
+    // ProtocolLib — задел под будущих клонов Ishigava (пока не используется)
+    compileOnly "com.comphenix.protocol:ProtocolLib:5.3.0"
+
+    // Citizens — soft-depend: используется только для NPC-клонов ульты TimeWalker.
+    // Если плагин не установлен, ульта работает на частицах (класс с Citizens не грузится).
+    // transitive=false: нужны только API-классы Citizens для компиляции, а его рантайм-зависимости
+    // (libby-bukkit и т.п.) предоставляет сам плагин Citizens на сервере.
+    compileOnly("net.citizensnpcs:citizens-main:2.0.42-SNAPSHOT") {
+        transitive = false
+    }
 }
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+// === Деплой на тест-сервер ===
+// build  -> копирует собранный jar в папку plugins сервера
+// clean  -> удаляет наш jar оттуда
+def serverPluginsDir = file("/Users/admin/Desktop/Lw0Coding/LastWar0/plugins")
+
+// Копируем ровно один jar вручную (без Copy-таска), чтобы Gradle не сканировал
+// папку plugins сервера — там рантайм-файлы, которые он не может прочитать.
+tasks.register('copyToServer') {
+    dependsOn tasks.named('jar')
+    doLast {
+        def jarFile = tasks.named('jar').get().archiveFile.get().asFile
+        java.nio.file.Files.copy(
+                jarFile.toPath(),
+                new File(serverPluginsDir, jarFile.name).toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+        println "Copied ${jarFile.name} -> ${serverPluginsDir}"
+    }
+}
+
+tasks.named('build') {
+    finalizedBy 'copyToServer'
+}
+
+tasks.named('clean') {
+    doLast {
+        serverPluginsDir.listFiles()?.findAll {
+            it.name.startsWith('warriors0-') && it.name.endsWith('.jar')
+        }?.each { it.delete() }
+    }
 }

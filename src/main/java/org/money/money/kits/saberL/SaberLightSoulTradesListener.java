@@ -19,10 +19,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.money.money.session.KitResettable;
 
 import java.util.*;
 
-public class SaberLightSoulTradesListener implements Listener {
+public class SaberLightSoulTradesListener implements Listener, KitResettable {
 
     private final JavaPlugin plugin;
 
@@ -481,6 +482,12 @@ public class SaberLightSoulTradesListener implements Listener {
         // Remove only if you want to fully clean buffs on reset:
         p.removePotionEffect(PotionEffectType.SPEED);
         p.removePotionEffect(PotionEffectType.JUMP_BOOST);
+    }
+
+    /** Конец игры / вход в лобби — снять перманентные баффы соул-трейдов. */
+    @Override
+    public void resetPlayer(Player player) {
+        resetSaberLightTrades(player);
     }
 
     // =========================================================

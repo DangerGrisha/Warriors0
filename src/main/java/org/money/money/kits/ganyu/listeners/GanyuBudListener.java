@@ -23,6 +23,7 @@ import org.bukkit.scoreboard.Team;
 import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
 import org.money.money.combat.ElementalReactions;
+import org.money.money.session.KitSession;
 
 import java.util.*;
 
@@ -208,7 +209,7 @@ public final class GanyuBudListener implements Listener {
 
     private void startCooldownReturnDye(Player p) {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!p.isOnline()) return;
+            if (!p.isOnline() || !KitSession.isInGame(p)) return;
             p.getInventory().addItem(makeFrostbudDye());
             p.sendMessage(
                     Component.text("Frostbud", NamedTextColor.AQUA)

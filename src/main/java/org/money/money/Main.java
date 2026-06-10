@@ -16,6 +16,25 @@ import org.money.money.kits.dio.DioHandListener;
 import org.money.money.kits.dio.DioStandFollower;
 import org.money.money.kits.dio.TimeStopListener;
 import org.money.money.kits.dio.VampireListener;
+import org.money.money.kits.fukuko.FukukoPistolListener;
+import org.money.money.kits.fukuko.FukukoMortiraListener;
+import org.money.money.kits.fukuko.FukukoBombZoneListener;
+import org.money.money.kits.ladynagan.LadyCooldownManager;
+import org.money.money.kits.ladynagan.LadyNaganSniperListener;
+import org.money.money.kits.ladynagan.LadyNaganFlyListener;
+import org.money.money.kits.ladynagan.LadyNaganTrapsListener;
+import org.money.money.kits.ladynagan.LadyNaganExplosionListener;
+import org.money.money.kits.saske.SaskeSwordListener;
+import org.money.money.kits.saske.SaskeShurikenListener;
+import org.money.money.kits.saske.SaskeBodyReplacementListener;
+import org.money.money.kits.saske.SaskeChidoriListener;
+import org.money.money.kits.saske.SaskeAttractionListener;
+import org.money.money.kits.ishigava.IshigavaWaterShieldListener;
+import org.money.money.kits.ishigava.IshigavaWaterBridgesListener;
+import org.money.money.kits.ishigava.IshigavaLastWaterWallListener;
+import org.money.money.kits.ishigava.IshigavaAuraListener;
+import org.money.money.kits.ishigava.IshigavaKunaiBowListener;
+import org.money.money.kits.ishigava.IshigavaCloneListener;
 import org.money.money.kits.ganyu.give.KitGiveCommand;
 import org.money.money.kits.ganyu.listeners.GanyuBowListener;
 import org.money.money.kits.ganyu.listeners.GanyuBudListener;
@@ -40,15 +59,35 @@ import org.money.money.kits.uraraka.UrarakaGravityListener;
 import org.money.money.kits.uraraka.UrarakaHealPostListener;
 import org.money.money.kits.saberL.SaberLightExcaliburListener;
 import org.money.money.kits.saberL.SaberLightSoulTradesListener;
+import org.money.money.kits.timewalker.TimeWalkerRunListener;
+import org.money.money.kits.timewalker.TimeWalkerSlashListener;
+import org.money.money.kits.timewalker.TimeWalkerMomentumListener;
+import org.money.money.kits.timewalker.TimeWalkerUltListener;
+import org.money.money.kits.blastborn.BlastbornManager;
+import org.money.money.kits.blastborn.BlastGlovesListener;
+import org.money.money.kits.blastborn.ImpactGrenadeListener;
+import org.money.money.kits.blastborn.PhoenixDetonatorListener;
+import org.money.money.kits.blastborn.SweatMachineGunListener;
 import org.bukkit.entity.Player;
 
 public final class Main extends JavaPlugin {
     private ElementalReactions elemental;
     private DioStandFollower dio;
     private GrillManager grillManager;
+    private org.money.money.kits.ladynagan.LadyNaganSniperListener ladySniper;
+    private TimeWalkerMomentumListener timeWalkerMomentum;
+    private TimeWalkerUltListener timeWalkerUlt;
+    private BlastbornManager blastbornManager;
+    private ImpactGrenadeListener blastGrenade;
+    private PhoenixDetonatorListener blastPhoenix;
+    private SweatMachineGunListener blastGun;
+    private IshigavaCloneListener ishigavaClones;
 
     @Override
     public void onEnable() {
+
+        saveDefaultConfig();
+        org.money.money.session.KitSession.configureLobbyWorlds(getConfig().getStringList("lobby-worlds"));
 
         elemental = new ElementalReactions(this);
         grillManager = new GrillManager(this);        // сам регистрирует свои события
@@ -86,6 +125,43 @@ public final class Main extends JavaPlugin {
         var saberlightrealese = new SaberLightUltimateListener(this, saberlightexcalibur);
         var saberdarkexcalibur = new SaberDarkExcaliburListener(this);
         var saberdarkrelease = new SaberDarkUltimateListener(this, saberdarkexcalibur);
+        var fukukoPistol   = new FukukoPistolListener(this);
+        var fukukoMortira  = new FukukoMortiraListener(this);
+        var fukukoBombZone = new FukukoBombZoneListener(this);
+        var ladyCooldowns  = new LadyCooldownManager(this);
+        this.ladySniper    = new LadyNaganSniperListener(this, ladyCooldowns);
+        var ladySniper     = this.ladySniper;
+        var ladyFly        = new LadyNaganFlyListener(this, ladyCooldowns);
+        var ladyTraps      = new LadyNaganTrapsListener(this, ladyCooldowns);
+        var ladyExplosion  = new LadyNaganExplosionListener(this, ladyCooldowns);
+        var saskeCooldowns = new LadyCooldownManager(this);
+        var saskeSword     = new SaskeSwordListener(this);
+        var saskeShuriken  = new SaskeShurikenListener(this);
+        var saskeBody      = new SaskeBodyReplacementListener(this, saskeCooldowns);
+        var saskeChidori   = new SaskeChidoriListener(this, saskeCooldowns);
+        var saskeAttraction = new SaskeAttractionListener(this, saskeCooldowns);
+        var ishiShield     = new IshigavaWaterShieldListener(this);
+        var ishiBridges    = new IshigavaWaterBridgesListener(this);
+        var ishiWall       = new IshigavaLastWaterWallListener(this);
+        var ishiAura       = new IshigavaAuraListener(this);
+        var ishiKunai      = new IshigavaKunaiBowListener(this);
+        var ishiClones     = new IshigavaCloneListener(this);
+        this.ishigavaClones = ishiClones;
+        var twRun          = new TimeWalkerRunListener(this);
+        var twSlash        = new TimeWalkerSlashListener(this);
+        var twMomentum     = new TimeWalkerMomentumListener(this);
+        var twUlt          = new TimeWalkerUltListener(this);
+        this.timeWalkerMomentum = twMomentum;
+        this.timeWalkerUlt = twUlt;
+        var blastMgr       = new BlastbornManager(this);
+        var blastGloves    = new BlastGlovesListener(this, blastMgr);
+        var blastGren      = new ImpactGrenadeListener(this, blastMgr);
+        var blastPhx       = new PhoenixDetonatorListener(this, blastMgr);
+        var blastGun       = new SweatMachineGunListener(this, blastMgr);
+        this.blastbornManager = blastMgr;
+        this.blastGrenade = blastGren;
+        this.blastPhoenix = blastPhx;
+        this.blastGun = blastGun;
 
 
         getServer().getPluginManager().registerEvents(bow,  this);
@@ -119,10 +195,44 @@ public final class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(operaAura, this);
         getServer().getPluginManager().registerEvents(saberlightrealese, this);
         getServer().getPluginManager().registerEvents(saberdarkrelease, this);
+        getServer().getPluginManager().registerEvents(fukukoPistol,   this);
+        getServer().getPluginManager().registerEvents(fukukoMortira,  this);
+        getServer().getPluginManager().registerEvents(fukukoBombZone, this);
+        getServer().getPluginManager().registerEvents(ladySniper,    this);
+        getServer().getPluginManager().registerEvents(ladyFly,       this);
+        getServer().getPluginManager().registerEvents(ladyTraps,     this);
+        getServer().getPluginManager().registerEvents(ladyExplosion, this);
+        getServer().getPluginManager().registerEvents(saskeSword,      this);
+        getServer().getPluginManager().registerEvents(saskeShuriken,   this);
+        getServer().getPluginManager().registerEvents(saskeBody,       this);
+        getServer().getPluginManager().registerEvents(saskeChidori,    this);
+        getServer().getPluginManager().registerEvents(saskeAttraction, this);
+        getServer().getPluginManager().registerEvents(ishiShield,   this);
+        getServer().getPluginManager().registerEvents(ishiBridges,  this);
+        getServer().getPluginManager().registerEvents(ishiWall,     this);
+        getServer().getPluginManager().registerEvents(ishiAura,     this);
+        getServer().getPluginManager().registerEvents(ishiKunai,    this);
+        getServer().getPluginManager().registerEvents(ishiClones,   this);
+        getServer().getPluginManager().registerEvents(twRun,        this);
+        getServer().getPluginManager().registerEvents(twSlash,      this);
+        getServer().getPluginManager().registerEvents(twMomentum,   this);
+        getServer().getPluginManager().registerEvents(twUlt,        this);
+        getServer().getPluginManager().registerEvents(blastMgr,     this);
+        getServer().getPluginManager().registerEvents(blastGloves,  this);
+        getServer().getPluginManager().registerEvents(blastGren,    this);
+        getServer().getPluginManager().registerEvents(blastPhx,     this);
+        getServer().getPluginManager().registerEvents(blastGun,     this);
 
         var kit = new KitGiveCommand(this, bud, ult, homa, pyro, boom, timestop, vampire, glove, gravity, post,
                 levitationMark, rassengan, randomtp, clones, grill, garden, hungry, wind, windult, windsword, windinvis,
-                haoh, mask, opera, operaAura, saberlightexcalibur, saberlightrealese, saberdarkexcalibur, saberdarkrelease);
+                haoh, mask, opera, operaAura, saberlightexcalibur, saberlightrealese, saberdarkexcalibur, saberdarkrelease,
+                fukukoPistol, fukukoMortira, fukukoBombZone,
+                ladySniper, ladyFly, ladyTraps, ladyExplosion,
+                saskeSword, saskeShuriken, saskeBody, saskeChidori, saskeAttraction,
+                ishiShield, ishiBridges, ishiWall, ishiAura, ishiKunai,
+                twRun, twSlash, twMomentum, twUlt,
+                blastMgr, blastGloves, blastGren, blastPhx, blastGun,
+                ishiClones);
         getCommand("kitgive").setExecutor(kit);
         getCommand("kitgive").setTabCompleter(kit);
 
@@ -171,12 +281,40 @@ public final class Main extends JavaPlugin {
                 });
 
         getServer().getPluginManager().registerEvents(tradesListener, this);
+
+        // Очистка состояния способностей при возврате в лобби / по команде конца игры.
+        java.util.List<org.money.money.session.KitResettable> resettables = new java.util.ArrayList<>();
+        if (this.ladySniper != null) resettables.add(this.ladySniper);
+        resettables.add(homa);
+        resettables.add(tradesListener);
+        if (this.dio != null) resettables.add(this.dio);
+        resettables.add(twRun);
+        resettables.add(twSlash);
+        resettables.add(twMomentum);
+        resettables.add(twUlt);
+        resettables.add(blastMgr);
+        resettables.add(blastGloves);
+        resettables.add(blastGren);
+        resettables.add(blastPhx);
+        resettables.add(blastGun);
+        resettables.add(ishiClones);
+        var sessionManager = new org.money.money.session.SessionManager(resettables);
+        getServer().getPluginManager().registerEvents(sessionManager, this);
+        getCommand("warriors").setExecutor(sessionManager);
+        getCommand("warriors").setTabCompleter(sessionManager);
     }
 
     public ElementalReactions elemental() { return elemental; }
 
     @Override public void onDisable(){ if (dio != null) dio.shutdown();
-    
+        if (ladySniper != null) ladySniper.shutdown();
+        if (timeWalkerMomentum != null) timeWalkerMomentum.stop();
+        if (timeWalkerUlt != null) timeWalkerUlt.shutdownClones();
+        if (blastbornManager != null) blastbornManager.stop();
+        if (blastGrenade != null) blastGrenade.stop();
+        if (blastPhoenix != null) blastPhoenix.shutdown();
+        if (blastGun != null) blastGun.stop();
+        if (ishigavaClones != null) ishigavaClones.shutdown();
 
     }
 

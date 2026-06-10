@@ -35,7 +35,7 @@ public final class GrillManager implements Listener {
     private static final double TRAPDOOR_Y_OFFSET = 0.42;          // чуть ниже центра
     private static final double HEAD_PITCH_DEG    = -90.0;         // крышка параллельно полу
     private static final long   GUARD_PERIOD      = 20L;           // 1 сек
-    private static final long   COOK_TIME_TICKS   = 20L * 60;      // 60 секунд на готовку
+    private static final long   COOK_TIME_TICKS   = 20L * 30;      // 30 секунд на готовку
 
     private static final Component GUI_TITLE = Component.text("Grill");
     private static final int GUI_SIZE = 27; // 3 ряда
@@ -521,8 +521,8 @@ public final class GrillManager implements Listener {
             job.ready = false;
 
             // первичное UI
-            top.setItem(PROG_SLOTS[free], makeCenterProgress(type, 60));
-            top.setItem(OUT_SLOTS[free],  makeOutputCooking(type, 60));
+            top.setItem(PROG_SLOTS[free], makeCenterProgress(type, 30));
+            top.setItem(OUT_SLOTS[free],  makeOutputCooking(type, 30));
 
             // тикер обновления
             job.ticker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {

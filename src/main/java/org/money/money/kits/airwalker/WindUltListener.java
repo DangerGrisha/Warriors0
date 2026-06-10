@@ -21,13 +21,15 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.money.money.session.KitSession;
 
 import java.util.*;
 
 public final class WindUltListener implements Listener {
 
     // ===== Ult settings =====
-    private static final long ULT_DURATION_TICKS = 45L * 20L; // 45 seconds
+    private static final long ULT_DURATION_TICKS = 45L * 20L;  // длительность эффекта — 45с
+    private static final long ULT_COOLDOWN_TICKS = 180L * 20L; // кд до возврата кнопки — 3 минуты (от активации)
     private static final String TAG_WIND_ULT = "WindUlt";
 
     // Slow Falling behavior while airborne (only during ult)
@@ -139,9 +141,10 @@ public final class WindUltListener implements Listener {
         p.addScoreboardTag(TAG_WIND_ULT);
 
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.8f);
-        p.sendMessage(Component.text("WindUlt activated (45s).", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("WindUlt activated (45s, cooldown 3m).", NamedTextColor.AQUA));
 
-        // Schedule end of ult
+        // Конец действия ульты (через 45с): снимаем эффекты, но предмет НЕ возвращаем —
+        // он на кулдауне.
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Player online = Bukkit.getPlayer(p.getUniqueId());
             ultActive.remove(p.getUniqueId());
@@ -149,11 +152,20 @@ public final class WindUltListener implements Listener {
             if (online != null && online.isOnline()) {
                 online.removeScoreboardTag(TAG_WIND_ULT);
                 online.removePotionEffect(PotionEffectType.SLOW_FALLING);
-                giveBackWindUlt(online);
                 online.playSound(online.getLocation(), Sound.UI_TOAST_OUT, 0.7f, 1.2f);
                 online.sendMessage(Component.text("WindUlt ended.", NamedTextColor.GRAY));
             }
         }, ULT_DURATION_TICKS);
+
+        // Возврат кнопки ульты только после полного кулдауна (3 минуты от активации).
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Player online = Bukkit.getPlayer(p.getUniqueId());
+            if (online != null && online.isOnline() && KitSession.isInGame(online)) {
+                giveBackWindUlt(online);
+                online.playSound(online.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.7f, 1.25f);
+                online.sendMessage(Component.text("WindUlt is ready again!", NamedTextColor.AQUA));
+            }
+        }, ULT_COOLDOWN_TICKS);
     }
 
     /* ================== Slow Falling while airborne ================== */

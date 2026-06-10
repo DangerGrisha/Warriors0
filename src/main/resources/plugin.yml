@@ -2,6 +2,7 @@ name: LastWarriors0
 main: org.money.money.Main
 version: 1.0
 api-version: 1.21
+softdepend: [Citizens]
 
 commands:
   kitgive:
@@ -10,10 +11,24 @@ commands:
       /kitgive Ganyu <bow|bud|ult> [player]
       /kitgive HuTao <homa|pyro> [player]
       /kitgive DIO <hand|timestop|vampire> [player]
+      /kitgive Fukuko <pistol|mortira|bombzone> [player]
+      /kitgive LadyNagan <sniper|ult|fly|trap|explosion> [player]
+      /kitgive Saske <katana|shuriken|body|chidori|attraction> [player]
+      /kitgive Ishigava <shield|bridge|wall|aura|kunai|clones> [player]
+      /kitgive TimeWalker <run|slash|momentum|ult> [player]
+      /kitgive Blastborn <gloves|grenade|ult|machinegun> [player]
     aliases: [kg]
     permission: kits.give
+  warriors:
+    description: Снять состояние способностей (конец игры / возврат в лобби)
+    usage: /warriors reset [all|<player>]
+    aliases: [wreset]
+    permission: warriors.admin
 
 permissions:
   kits.give:
     description: Allow using /kitgive
+    default: op
+  warriors.admin:
+    description: Allow using /warriors reset
     default: op
