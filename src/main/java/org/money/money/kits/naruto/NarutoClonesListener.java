@@ -33,11 +33,15 @@ import java.util.concurrent.TimeUnit;
 
 public final class NarutoClonesListener implements Listener {
 
-    private static final int   COUNT            = 15;
     private static final long  COOLDOWN_MS      = 90_000L;        // 1.5 мин
-    private static final int   RANGE_BLOCKS     = 20;
-    private static final int   SLOW_TICKS       = 20;              // 1 c
-    private static final int   ZOMBIE_HEALTH_HP = 1;
+
+    // баланс — читается из ClassRegistry при использовании (def = прежние значения)
+    private static int cloneCount()       { return org.money.money.meta.ClassRegistry.numInt("naruto", "clones", "count", 15); }
+    private static int lifetimeTicks()    { return org.money.money.meta.ClassRegistry.numInt("naruto", "clones", "lifetimeTicks", 1800); }
+    private static int rangeBlocks()      { return org.money.money.meta.ClassRegistry.numInt("naruto", "clones", "rangeBlocks", 20); }
+    private static int slowTicks()        { return org.money.money.meta.ClassRegistry.numInt("naruto", "clones", "slowDurationTicks", 20); }
+    private static int slowAmplifier()    { return org.money.money.meta.ClassRegistry.numInt("naruto", "clones", "slowAmplifier", 3); }
+    private static double cloneHealth()   { return org.money.money.meta.ClassRegistry.num("naruto", "clones", "cloneHealth", 1.0); }
 
     private final Plugin plugin;
 
@@ -92,7 +96,7 @@ public final class NarutoClonesListener implements Listener {
         p.playSound(p.getLocation(), Sound.ENTITY_ILLUSIONER_PREPARE_MIRROR, 0.9f, 1.2f);
 
         // точка по взгляду (до 20 блоков)
-        Location target = lookPoint(p, RANGE_BLOCKS);
+        Location target = lookPoint(p, rangeBlocks());
         if (target == null) target = p.getLocation().add(p.getLocation().getDirection().normalize().multiply(6));
 
         // съесть предмет
@@ -116,7 +120,7 @@ public final class NarutoClonesListener implements Listener {
 
         // на всякий — если игрок умрёт/выйдет раньше, в их событиях мы тоже чистим
         int tid = Bukkit.getScheduler().runTaskLater(plugin, () -> removeClones(p.getUniqueId()),
-                COOLDOWN_MS / 50L).getTaskId();
+                lifetimeTicks()).getTaskId();
         despawnTaskId.put(p.getUniqueId(), tid);
     }
 
@@ -152,7 +156,7 @@ public final class NarutoClonesListener implements Listener {
 
         if (e.getEntity() instanceof Player victim) {
             victim.addPotionEffect(new PotionEffect(
-                    PotionEffectType.SLOWNESS, SLOW_TICKS, 3, false, true, true
+                    PotionEffectType.SLOWNESS, slowTicks(), slowAmplifier(), false, true, true
             ));
         }
     }
@@ -169,13 +173,15 @@ public final class NarutoClonesListener implements Listener {
         w.spawnParticle(Particle.CLOUD, center, 40, 1.2, 0.6, 1.2, 0.01);
         w.playSound(center, Sound.ENTITY_ZOMBIE_INFECT, 0.9f, 0.8f);
 
-        Set<UUID> set = new HashSet<>(COUNT);
+        int count = cloneCount();
+        double health = cloneHealth();
+        Set<UUID> set = new HashSet<>(count);
         clonesByOwner.put(owner.getUniqueId(), set);
 
         // окружность + случайный разброс
         double radius = 3.0;
-        for (int i = 0; i < COUNT; i++) {
-            double ang = (2 * Math.PI * i) / COUNT;
+        for (int i = 0; i < count; i++) {
+            double ang = (2 * Math.PI * i) / count;
             double dx = Math.cos(ang) * radius + (Math.random() - 0.5) * 1.2;
             double dz = Math.sin(ang) * radius + (Math.random() - 0.5) * 1.2;
             Location spot = center.clone().add(dx, 0, dz);
@@ -190,8 +196,8 @@ public final class NarutoClonesListener implements Listener {
 
             // 1 HP
             try {
-                z.getAttribute(Attribute.MAX_HEALTH).setBaseValue(ZOMBIE_HEALTH_HP);
-                z.setHealth(ZOMBIE_HEALTH_HP);
+                z.getAttribute(Attribute.MAX_HEALTH).setBaseValue(health);
+                z.setHealth(health);
             } catch (Throwable ignored) { z.setHealth(1.0); }
 
             set.add(z.getUniqueId());

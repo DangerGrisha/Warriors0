@@ -30,7 +30,8 @@ import java.util.UUID;
 public class SaskeShurikenListener implements Listener {
 
     private static final String SHURIKEN_NAME = "Shuriken";
-    private static final int    SHURIKEN_DAMAGE = 7;
+    private static int SHURIKEN_DAMAGE() { return org.money.money.meta.ClassRegistry.numInt("saske", "shuriken", "bonusDamage", 7); }
+    private static int SHURIKEN_COUNT() { return org.money.money.meta.ClassRegistry.numInt("saske", "shuriken", "count", 3); }
     private static final long   COOLDOWN_SECONDS = 25;
 
     private final Plugin plugin;
@@ -43,7 +44,7 @@ public class SaskeShurikenListener implements Listener {
     /* ===================== Выдача ===================== */
 
     public ItemStack makeShuriken() {
-        ItemStack item = new ItemStack(Material.SNOWBALL, 3);
+        ItemStack item = new ItemStack(Material.SNOWBALL, SHURIKEN_COUNT());
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(SHURIKEN_NAME));
         meta.setUnbreakable(true);
@@ -60,7 +61,7 @@ public class SaskeShurikenListener implements Listener {
     @EventHandler
     public void onDamage(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Snowball && event.getEntity() instanceof LivingEntity) {
-            final double totalDamage = event.getDamage() + SHURIKEN_DAMAGE;
+            final double totalDamage = event.getDamage() + SHURIKEN_DAMAGE();
             event.setDamage(totalDamage);
         }
     }
@@ -93,7 +94,7 @@ public class SaskeShurikenListener implements Listener {
                 onCooldown.remove(player.getUniqueId());
                 if (!player.isOnline()) return;
                 ItemStack stack = makeShuriken();
-                stack.setAmount(3);
+                stack.setAmount(SHURIKEN_COUNT());
                 var leftover = player.getInventory().addItem(stack);
                 leftover.values().forEach(rem -> player.getWorld().dropItemNaturally(player.getLocation(), rem));
             }

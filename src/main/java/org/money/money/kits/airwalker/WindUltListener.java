@@ -28,15 +28,18 @@ import java.util.*;
 public final class WindUltListener implements Listener {
 
     // ===== Ult settings =====
-    private static final long ULT_DURATION_TICKS = 45L * 20L;  // длительность эффекта — 45с
-    private static final long ULT_COOLDOWN_TICKS = 180L * 20L; // кд до возврата кнопки — 3 минуты (от активации)
+    private static long ULT_DURATION_TICKS() { return org.money.money.meta.ClassRegistry.numInt("airwalker", "windult", "durationTicks", 600); }  // длительность эффекта — 30с
+    private static final long ULT_COOLDOWN_TICKS = 300L * 20L; // кд до возврата кнопки — 5 минут (от активации)
     private static final String TAG_WIND_ULT = "WindUlt";
+    // Внешняя игра: пока Airwalker в ульте — ей нельзя подбирать флаг. Тот же scoreboard-тег,
+    // что вешает TimeWalker Future Run; его читает внешний плагин.
+    private static final String TAG_CANT_PICKUP_FLAG = "cantpickupflag";
 
     // Slow Falling behavior while airborne (only during ult)
     // Strong/weak difference is basically amplifier; duration is refreshed constantly.
     private static final int SF_REFRESH_TICKS = 30;  // refresh buffer
-    private static final int SF_STRONG_AMP = 15;      // "very strong" slow falling (amplifier doesn't change much, but ok)
-    private static final int SF_WEAK_AMP   = 5;      // weak slow falling
+    private static int SF_STRONG_AMP() { return org.money.money.meta.ClassRegistry.numInt("airwalker", "windult", "slowFallStrongAmplifier", 15); }      // "very strong" slow falling (amplifier doesn't change much, but ok)
+    private static int SF_WEAK_AMP() { return org.money.money.meta.ClassRegistry.numInt("airwalker", "windult", "slowFallWeakAmplifier", 5); }      // weak slow falling
 
     private final Plugin plugin;
 
@@ -139,9 +142,10 @@ public final class WindUltListener implements Listener {
 
         ultActive.add(p.getUniqueId());
         p.addScoreboardTag(TAG_WIND_ULT);
+        p.addScoreboardTag(TAG_CANT_PICKUP_FLAG); // пока в ульте — нельзя подбирать флаг
 
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.8f);
-        p.sendMessage(Component.text("WindUlt activated (45s, cooldown 3m).", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("WindUlt activated (30s, cooldown 5m).", NamedTextColor.AQUA));
 
         // Конец действия ульты (через 45с): снимаем эффекты, но предмет НЕ возвращаем —
         // он на кулдауне.
@@ -151,11 +155,12 @@ public final class WindUltListener implements Listener {
 
             if (online != null && online.isOnline()) {
                 online.removeScoreboardTag(TAG_WIND_ULT);
+                online.removeScoreboardTag(TAG_CANT_PICKUP_FLAG);
                 online.removePotionEffect(PotionEffectType.SLOW_FALLING);
                 online.playSound(online.getLocation(), Sound.UI_TOAST_OUT, 0.7f, 1.2f);
                 online.sendMessage(Component.text("WindUlt ended.", NamedTextColor.GRAY));
             }
-        }, ULT_DURATION_TICKS);
+        }, ULT_DURATION_TICKS());
 
         // Возврат кнопки ульты только после полного кулдауна (3 минуты от активации).
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -198,7 +203,7 @@ public final class WindUltListener implements Listener {
             return;
         }
 
-        int amp = p.isSneaking() ? SF_WEAK_AMP : SF_STRONG_AMP;
+        int amp = p.isSneaking() ? SF_WEAK_AMP() : SF_STRONG_AMP();
 
         // Refresh effect continuously so it persists until landing
         PotionEffect eff = new PotionEffect(
@@ -214,7 +219,12 @@ public final class WindUltListener implements Listener {
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent e) {
-        ultActive.remove(e.getPlayer().getUniqueId());
+        Player p = e.getPlayer();
+        ultActive.remove(p.getUniqueId());
+        // scoreboard-теги хранятся в NBT игрока: снимаем при выходе, иначе «нельзя подбирать
+        // флаг» (и состояние ульты) залипнет после переподключения.
+        p.removeScoreboardTag(TAG_WIND_ULT);
+        p.removeScoreboardTag(TAG_CANT_PICKUP_FLAG);
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
@@ -222,6 +232,7 @@ public final class WindUltListener implements Listener {
         Player p = e.getEntity();
         ultActive.remove(p.getUniqueId());
         p.removeScoreboardTag(TAG_WIND_ULT);
+        p.removeScoreboardTag(TAG_CANT_PICKUP_FLAG);
         p.removePotionEffect(PotionEffectType.SLOW_FALLING);
     }
 }

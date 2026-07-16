@@ -29,6 +29,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -60,11 +61,19 @@ public final class IshigavaCloneListener implements Listener, KitResettable {
     private final NamespacedKey KEY_CLONES;
 
     // ===== Config =====
-    private final int durationTicks;
-    private final long cooldownMs;
-    private final double cloneHealth;
-    private final double spacing;
     private final String cloneSkin;
+
+    private static int durationTicks() {
+        return Math.max(1, ClassRegistry.numInt("ishigava", "clones", "durationSeconds", 40)) * 20;
+    }
+
+    private static double cloneHealth() {
+        return ClassRegistry.num("ishigava", "clones", "cloneHealth", 6.0);
+    }
+
+    private static double spacing() {
+        return ClassRegistry.num("ishigava", "clones", "spacingBlocks", 2.6);
+    }
 
     // Citizens controller (lazy; only created when Citizens is installed).
     private IshigavaCloneNpcs npcs;
@@ -90,10 +99,6 @@ public final class IshigavaCloneListener implements Listener, KitResettable {
         this.plugin = Objects.requireNonNull(plugin);
         this.KEY_CLONES = new NamespacedKey(plugin, "ishigava_clones");
 
-        this.durationTicks = Math.max(1, plugin.getConfig().getInt("ishigava.clones.durationSeconds", 40)) * 20;
-        this.cooldownMs = Math.max(0, plugin.getConfig().getInt("ishigava.clones.cooldownSeconds", 120)) * 1000L;
-        this.cloneHealth = plugin.getConfig().getDouble("ishigava.clones.cloneHealth", 6.0);
-        this.spacing = plugin.getConfig().getDouble("ishigava.clones.spacing", 2.6);
         this.cloneSkin = plugin.getConfig().getString("ishigava.clones.skinName", "_Heugo");
 
         INSTANCE = this;
@@ -156,6 +161,7 @@ public final class IshigavaCloneListener implements Listener, KitResettable {
 
         long now = System.currentTimeMillis();
         if (cooldown.containsKey(id)) {
+            long cooldownMs = ClassRegistry.millis("ishigava", "clones", 120_000L);
             long passed = now - cooldown.get(id);
             if (passed < cooldownMs) {
                 long secLeft = (cooldownMs - passed + 999) / 1000;
@@ -197,7 +203,7 @@ public final class IshigavaCloneListener implements Listener, KitResettable {
 
         ItemStack held = p.getInventory().getItemInMainHand();
         s.lastItem = held == null ? null : held.clone();
-        npcs.spawn(p, 2, new Location[]{loc1, loc3}, cloneHealth, held, cloneSkin);
+        npcs.spawn(p, 2, new Location[]{loc1, loc3}, cloneHealth(), held, cloneSkin);
 
         p.addScoreboardTag(TAG_CLONES);
         p.getWorld().playSound(p.getLocation(), Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 1.0f, 1.0f);
@@ -224,7 +230,7 @@ public final class IshigavaCloneListener implements Listener, KitResettable {
             return;
         }
 
-        if (s.elapsed >= durationTicks) {
+        if (s.elapsed >= durationTicks()) {
             end(id, true);
             return;
         }
@@ -366,7 +372,7 @@ public final class IshigavaCloneListener implements Listener, KitResettable {
 
     /** Offset of a slot from the formation centre, along the right vector. slot1=left, slot3=right. */
     private double slotOffset(int slot) {
-        return (slot - 2) * spacing;
+        return (slot - 2) * spacing();
     }
 
     private boolean sameItem(ItemStack a, ItemStack b) {

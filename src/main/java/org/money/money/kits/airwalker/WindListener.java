@@ -32,17 +32,17 @@ public final class WindListener implements Listener {
     // ===== Settings =====
     private static final double ANCHOR_OFFSET_FROM_BLOCK = 0.15;
 
-    private static final double BLOW_RADIUS = 5.0;
+    private static double BLOW_RADIUS() { return org.money.money.meta.ClassRegistry.num("airwalker", "wind", "radius", 5.0); }
 
     // Wind strength (x2)
-    private static final double BLOW_STRENGTH = 2.5;
-    private static final double EXTRA_UP = 0.15;
+    private static double BLOW_STRENGTH() { return org.money.money.meta.ClassRegistry.num("airwalker", "wind", "pushPower", 2.5); }
+    private static double EXTRA_UP() { return org.money.money.meta.ClassRegistry.num("airwalker", "wind", "pushUp", 0.15); }
 
-    private static final double ANCHOR_MAX_DISTANCE_NORMAL = 60.0;
-    private static final double ANCHOR_MAX_DISTANCE_ULT = 120.0;
+    private static double ANCHOR_MAX_DISTANCE_NORMAL() { return org.money.money.meta.ClassRegistry.num("airwalker", "wind", "anchorRange", 60.0); }
+    private static double ANCHOR_MAX_DISTANCE_ULT() { return org.money.money.meta.ClassRegistry.num("airwalker", "wind", "anchorRangeUlt", 120.0); }
 
     // Levitations: apply for 1s, remove after 0.5s
-    private static final int LEVITATION_TICKS = 20;
+    private static int LEVITATION_TICKS() { return org.money.money.meta.ClassRegistry.numInt("airwalker", "wind", "levitationTicks", 20); }
     private static final int REMOVE_LEVITATION_AFTER = 10;
 
     // Regen: +1 charge after 20s (only when a charge was consumed)
@@ -240,7 +240,7 @@ public final class WindListener implements Listener {
     private void placeOrMoveAnchor(Player p) {
         removeAnchor(p);
         boolean ult = hasUltTag(p);
-        double maxDist = ult ? ANCHOR_MAX_DISTANCE_ULT : ANCHOR_MAX_DISTANCE_NORMAL;
+        double maxDist = ult ? ANCHOR_MAX_DISTANCE_ULT() : ANCHOR_MAX_DISTANCE_NORMAL();
 
         Location eye = p.getEyeLocation();
         Vector dir = eye.getDirection().normalize();
@@ -323,18 +323,18 @@ public final class WindListener implements Listener {
         spawnWindWallParticles(w, origin, dir);
 
         // Apply to nearby entities (fast)
-        Collection<Entity> nearby = w.getNearbyEntities(origin, BLOW_RADIUS, BLOW_RADIUS, BLOW_RADIUS);
+        Collection<Entity> nearby = w.getNearbyEntities(origin, BLOW_RADIUS(), BLOW_RADIUS(), BLOW_RADIUS());
 
         for (Entity ent : nearby) {
             if (!(ent instanceof LivingEntity le)) continue;
             if (!ent.isValid()) continue;
 
-            Vector v = dir.clone().multiply(BLOW_STRENGTH);
-            v.setY(v.getY() + EXTRA_UP);
+            Vector v = dir.clone().multiply(BLOW_STRENGTH());
+            v.setY(v.getY() + EXTRA_UP());
 
             le.setVelocity(v);
 
-            PotionEffect lev = new PotionEffect(PotionEffectType.LEVITATION, LEVITATION_TICKS, 0, false, false, false);
+            PotionEffect lev = new PotionEffect(PotionEffectType.LEVITATION, LEVITATION_TICKS(), 0, false, false, false);
             le.addPotionEffect(lev);
 
             Bukkit.getScheduler().runTaskLater(plugin, () -> {

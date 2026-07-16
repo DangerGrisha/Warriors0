@@ -7,6 +7,7 @@ import org.bukkit.entity.*;
 import org.bukkit.event.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -19,6 +20,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.RayTraceResult;
+
+import org.money.money.session.KitSession;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -62,8 +66,10 @@ public final class LevitationMarkListener implements Listener {
         it.setItemMeta(im);
         return it;
     }
-    // Владелец выбрал цель ударом — ставим метку на 60с
-    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
+    // Владелец выбрал цель ударом — ставим метку на 60с.
+    // ignoreCancelled=false: удар по тиммейту с выключенным дружественным огнём приходит
+    // ОТМЕНЁННЫМ (урон не проходит) — но метку на своих ставить как раз и нужно.
+    @EventHandler(ignoreCancelled = false, priority = EventPriority.MONITOR)
     public void onOwnerPickTarget(EntityDamageByEntityEvent e) {
         // кого ударили — хотим только игроков (или поставь LivingEntity, если нужно на всех)
         if (!(e.getEntity() instanceof Player victim)) return;
@@ -71,20 +77,46 @@ public final class LevitationMarkListener implements Listener {
         // кто ударил
         Player owner = damagerAsPlayer(e.getDamager());
         if (owner == null) return;
+        if (!armed.contains(owner.getUniqueId())) return; // не «заряжён» => ничего не делаем
 
+        placeMark(owner, victim);
+    }
+
+    /**
+     * Постановка метки БЕЗ урона. Если дружественный огонь выключен через scoreboard-команды,
+     * удар по своему вообще НЕ порождает EntityDamageByEntityEvent — а метку ставят именно на своих.
+     * Поэтому «заряженный» владелец выбирает цель простым ЛКМ (взмахом руки): берём игрока, на
+     * которого он смотрит (raycast в пределах дальности удара). «Впустую махнул» — остаёмся заряжены.
+     */
+    @EventHandler(ignoreCancelled = false, priority = EventPriority.MONITOR)
+    public void onOwnerSwingPickTarget(PlayerAnimationEvent e) {
+        Player owner = e.getPlayer();
+        if (!armed.contains(owner.getUniqueId())) return;
+        Player victim = raycastPlayer(owner);
+        if (victim != null) placeMark(owner, victim);
+    }
+
+    /** Общая постановка метки от выбранной цели: снимаем «заряд», ставим метку на минуту, фидбэк. */
+    private void placeMark(Player owner, Player victim) {
         UUID ownerId = owner.getUniqueId();
-        if (!armed.contains(ownerId)) return; // не «заряжён» => ничего не делаем
-
-        // один раз из «armed» выходим
-        armed.remove(ownerId);
-
-        // ставим метку на минуту (1200 тиков)
-        putMark(ownerId, victim.getUniqueId(), 20L * 60);
-
-        // немного фидбэка
+        if (!armed.remove(ownerId)) return; // защита от двойного срабатывания (взмах + урон)
+        putMark(ownerId, victim.getUniqueId(),
+                org.money.money.meta.ClassRegistry.numInt("uraraka", "levmark", "markDurationTicks", 1200));
         owner.playSound(owner.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.7f, 1.4f);
         owner.sendMessage(Component.text(
                 "Levitation Mark: цель " + victim.getName() + " отмечена на 60с.", NamedTextColor.GREEN));
+    }
+
+    /** Ближайший игрок, на которого смотрит владелец, в пределах дальности «удара». */
+    private Player raycastPlayer(Player owner) {
+        var eye = owner.getEyeLocation();
+        double range = org.money.money.meta.ClassRegistry.num("uraraka", "levmark", "pickRange", 4.0);
+        RayTraceResult r = owner.getWorld().rayTraceEntities(
+                eye, eye.getDirection(), range, 0.6,
+                en -> en instanceof Player pl
+                        && !pl.getUniqueId().equals(owner.getUniqueId())
+                        && pl.getGameMode() != GameMode.SPECTATOR);
+        return (r != null && r.getHitEntity() instanceof Player victim) ? victim : null;
     }
 
     private boolean isMarkItem(ItemStack it) {
@@ -122,7 +154,8 @@ public final class LevitationMarkListener implements Listener {
         Bukkit.getAsyncScheduler().runDelayed(plugin, task ->
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     Player pl = Bukkit.getPlayer(p.getUniqueId());
-                    if (pl != null && pl.isOnline()) {
+                    // KitSession.isInGame — чтобы предмет не «всплыл» в лобби / после матча
+                    if (pl != null && pl.isOnline() && KitSession.isInGame(pl)) {
                         // не выдаём второй, если уже где-то появился
                         if (!playerHas(pl)) {
                             giveToHandOrInv(pl, makeLevitationMarkDye());
@@ -167,8 +200,8 @@ public final class LevitationMarkListener implements Listener {
     private void applyOwnerOneShotLevitation(LivingEntity owner) {
         owner.addPotionEffect(new PotionEffect(
                 PotionEffectType.LEVITATION,
-                20,           // 1 сек
-                29,           // amplifier 29 = 30 уровень
+                org.money.money.meta.ClassRegistry.numInt("uraraka", "levmark", "ownerLiftDurationTicks", 20),           // 1 сек
+                org.money.money.meta.ClassRegistry.numInt("uraraka", "levmark", "ownerLiftAmplifier", 29),           // amplifier 29 = 30 уровень
                 false, true, true
         ));
         try {
@@ -218,7 +251,7 @@ public final class LevitationMarkListener implements Listener {
         final int FIRST_DUR = 40;  // 2.0s
         final int NEXT_DUR  = 20;  // 1.0s
         final int GAP       = 6;   // 0.3s
-        final int TOTAL     = 200; // 10s суммарно (с учётом пауз)
+        final int TOTAL     = org.money.money.meta.ClassRegistry.numInt("uraraka", "levmark", "curseTotalTicks", 200); // 10s суммарно (с учётом пауз)
 
         chainLevitation(target, TOTAL, true, FIRST_DUR, NEXT_DUR, GAP);
     }
@@ -227,7 +260,7 @@ public final class LevitationMarkListener implements Listener {
         if (remain <= 0 || t == null || t.isDead() || !t.isValid()) return;
 
         int dur = first ? firstDur : nextDur;
-        int amp = 1; // Levitation II (уровень 2) => amplifier 1
+        int amp = org.money.money.meta.ClassRegistry.numInt("uraraka", "levmark", "curseAmplifier", 1); // Levitation II (уровень 2) => amplifier 1
         t.addPotionEffect(new PotionEffect(PotionEffectType.LEVITATION, dur, amp, false, true, true));
 
         int nextRemain = remain - dur - gap;

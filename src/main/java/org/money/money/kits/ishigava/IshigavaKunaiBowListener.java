@@ -25,6 +25,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 
 import java.util.HashMap;
 import java.util.List;
@@ -51,7 +52,6 @@ public class IshigavaKunaiBowListener implements Listener {
     private final Map<UUID, Player> hookedPlayerMap = new HashMap<>();
 
     private final Plugin plugin;
-    private static final double FORCE_MULTIPLIER = 2.1;
 
     public IshigavaKunaiBowListener(Plugin plugin) {
         this.plugin = plugin;
@@ -69,7 +69,8 @@ public class IshigavaKunaiBowListener implements Listener {
         // урон как у железного меча (6.0)
         AttributeModifier damage = new AttributeModifier(
                 new NamespacedKey(plugin, "ishigava_kunai_damage"),
-                6.0, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND);
+                ClassRegistry.num("ishigava", "kunai", "bowDamage", 6.0),
+                AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND);
         meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, damage);
 
         // скорость атаки как у железного меча (1.6 = база 4.0 - 2.4)
@@ -111,7 +112,8 @@ public class IshigavaKunaiBowListener implements Listener {
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.0f, 1.0f);
 
         Location start = player.getEyeLocation().add(player.getLocation().getDirection().normalize().multiply(1.0));
-        Vector velocity = player.getLocation().getDirection().normalize().multiply(power * FORCE_MULTIPLIER);
+        double forceMultiplier = ClassRegistry.num("ishigava", "kunai", "forceMultiplier", 2.1);
+        Vector velocity = player.getLocation().getDirection().normalize().multiply(power * forceMultiplier);
 
         Arrow arrow = player.getWorld().spawnArrow(start, velocity, (float) velocity.length(), 0f);
         arrow.setShooter(player);
@@ -146,7 +148,7 @@ public class IshigavaKunaiBowListener implements Listener {
                 }
 
                 if (arrow.isOnGround()) {
-                    if (arrow.getLocation().distance(player.getLocation()) > 15) {
+                    if (arrow.getLocation().distance(player.getLocation()) > ClassRegistry.num("ishigava", "kunai", "tetherRange", 15.0)) {
                         cleanup();
                         return;
                     }
@@ -256,7 +258,7 @@ public class IshigavaKunaiBowListener implements Listener {
             Location target = tetherTargets.get(uuid).clone();
 
             Vector direction = target.toVector().subtract(player.getLocation().toVector()).normalize();
-            Vector pull = direction.multiply(1.1 / 3.0);
+            Vector pull = direction.multiply(ClassRegistry.num("ishigava", "kunai", "pullSelfSpeed", 1.1 / 3.0));
 
             player.setVelocity(pull);
         } else if (type == Material.LIME_DYE) {
@@ -266,7 +268,9 @@ public class IshigavaKunaiBowListener implements Listener {
             Location self = player.getLocation();
             boolean targetInAir = !target.isOnGround();
 
-            double speed = targetInAir ? 0.8 : 0.4;
+            double speed = targetInAir
+                    ? ClassRegistry.num("ishigava", "kunai", "pullTargetAirSpeed", 0.8)
+                    : ClassRegistry.num("ishigava", "kunai", "pullTargetGroundSpeed", 0.4);
             Vector direction = self.toVector().subtract(target.getLocation().toVector()).normalize();
             Vector pull = direction.multiply(speed);
 
@@ -381,7 +385,7 @@ public class IshigavaKunaiBowListener implements Listener {
                     return;
                 }
 
-                if (shooter.getLocation().distance(target.getLocation()) > 15) {
+                if (shooter.getLocation().distance(target.getLocation()) > ClassRegistry.num("ishigava", "kunai", "tetherRange", 15.0)) {
                     cleanupAndCancel();
                     shooter.getInventory().setItem(slot, makeKunaiBow());
                     return;
@@ -429,7 +433,7 @@ public class IshigavaKunaiBowListener implements Listener {
                 hookedPlayerMap.remove(shooterUUID);
                 activeStandMap.remove(shooterUUID);
                 activeTasks.remove(shooterUUID);
-                target.damage(4.0);
+                target.damage(ClassRegistry.num("ishigava", "kunai", "releaseDamage", 4.0));
                 cancel();
             }
         }.runTaskTimer(plugin, 0L, 1L);
@@ -518,7 +522,8 @@ public class IshigavaKunaiBowListener implements Listener {
 
             AttributeModifier damageModifier = new AttributeModifier(
                     new NamespacedKey(plugin, "ishigava_tether_damage"),
-                    5.0, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND);
+                    ClassRegistry.num("ishigava", "kunai", "tetherDamage", 5.0),
+                    AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND);
             meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, damageModifier);
 
             AttributeModifier speedModifier = new AttributeModifier(

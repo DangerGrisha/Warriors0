@@ -16,6 +16,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.money.money.meta.ClassRegistry;
+import org.money.money.util.ItemModels;
 
 import java.util.List;
 import java.util.Map;
@@ -28,12 +30,12 @@ import java.util.Map;
  */
 public class LadyNaganExplosionListener implements Listener {
 
-    // числа 1:1 из LadyConstants
-    private static final float  EXPLOSION_RADIUS_SE = 6.0f;
-    private static final double DAMAGE_AMOUNT_SE = 26.0;
+    // числа 1:1 из LadyConstants (баланс читается из ClassRegistry при использовании)
     private static final boolean DAMAGE_TERRAIN_SE = true;
-    private static final int    DELAY_PERK_SE = 60;
     private static final int    EXPLOSION_SLOT = 7;
+
+    private static double explosionRadius() { return ClassRegistry.num("ladynagan", "explosion", "radius", 6.0); }
+    private static double explosionDamage() { return ClassRegistry.num("ladynagan", "explosion", "damage", 26.0); }
 
     private final String dyeName = "Self-Destruction";
 
@@ -54,6 +56,7 @@ public class LadyNaganExplosionListener implements Listener {
         meta.displayName(Component.text(dyeName));
         meta.setUnbreakable(true);
         meta.setLore(List.of("something"));
+        ItemModels.apply(meta, "ledynagan_boom_red");
         it.setItemMeta(meta);
         return it;
     }
@@ -67,7 +70,7 @@ public class LadyNaganExplosionListener implements Listener {
         if (hasSelfDestructionItem(player)) {
             doExplosion(player);
             replaceGreenDyeWithYellow(player);
-            delayForUlta(player, "ExplosionLadyNagan", EXPLOSION_SLOT, DELAY_PERK_SE);
+            delayForUlta(player, "ExplosionLadyNagan", EXPLOSION_SLOT, ClassRegistry.seconds("ladynagan", "explosion", 60));
         }
     }
 
@@ -87,16 +90,17 @@ public class LadyNaganExplosionListener implements Listener {
             if (player.isOnline()) doExplosion(player);
         });
         replaceGreenDyeWithYellow(player);
-        delayForUlta(player, "ExplosionLadyNagan", EXPLOSION_SLOT, DELAY_PERK_SE);
+        delayForUlta(player, "ExplosionLadyNagan", EXPLOSION_SLOT, ClassRegistry.seconds("ladynagan", "explosion", 60));
     }
 
     /** Взрыв вокруг леди: сама леди урон не получает. */
     private void doExplosion(Player player) {
         player.getWorld().createExplosion(player.getLocation(), 0, false, DAMAGE_TERRAIN_SE);
 
-        for (Entity entity : player.getNearbyEntities(EXPLOSION_RADIUS_SE, EXPLOSION_RADIUS_SE, EXPLOSION_RADIUS_SE)) {
+        double radius = explosionRadius();
+        for (Entity entity : player.getNearbyEntities(radius, radius, radius)) {
             if (entity instanceof LivingEntity target && !target.equals(player)) {
-                target.damage(DAMAGE_AMOUNT_SE, player);
+                target.damage(explosionDamage(), player);
             }
         }
     }

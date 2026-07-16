@@ -28,11 +28,12 @@ public final class HuTaoBoomListener implements Listener {
     private final ElementalReactions reactions; // ← добавили
 
     // настройки
-    private static final int COOLDOWN_TICKS         = 20 * 120; // 2 мин
     private static final int FUSE_TICKS             = 40;       // 2 сек «поджиг»
-    private static final double RADIUS              = 10.0;     // радиус взрыва
 
-    private static final int    EXPLOSION_IGNITE    = 20;       // ~1с горения на попадании
+    // баланс — читается из ClassRegistry при использовании (def = прежние значения)
+    private static double blastRadius()  { return org.money.money.meta.ClassRegistry.num("hutao", "ult", "radius", 10.0); }
+    private static double blastDamage()  { return org.money.money.meta.ClassRegistry.num("hutao", "ult", "damage", 28.0); }
+    private static int    igniteTicks()  { return org.money.money.meta.ClassRegistry.numInt("hutao", "ult", "igniteTicks", 20); }
 
     public HuTaoBoomListener(Plugin plugin, ElementalReactions reactions) {
         this.plugin = plugin;
@@ -77,13 +78,14 @@ public final class HuTaoBoomListener implements Listener {
         else hand.setAmount(hand.getAmount() - 1);
 
         // вернём через 2 минуты
+        int cooldownTicks = org.money.money.meta.ClassRegistry.ticks("hutao", "ult", 2400);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (p.isOnline() && KitSession.isInGame(p)) {
                 p.getInventory().addItem(makeBoomDye());
                 p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.6f);
                 p.sendMessage("§cBOOM§7 is ready again!");
             }
-        }, COOLDOWN_TICKS);
+        }, cooldownTicks);
 
         // место взрыва фиксируем сейчас
         Location fuseLoc = p.getLocation().clone().add(0, 0.1, 0);
@@ -114,7 +116,9 @@ public final class HuTaoBoomListener implements Listener {
         var orange = new Particle.DustOptions(org.bukkit.Color.fromRGB(255, 120, 40), 1.5f);
         var red    = new Particle.DustOptions(org.bukkit.Color.fromRGB(255, 40, 20), 1.5f);
         w.spawnParticle(Particle.EXPLOSION, center, 1, 0, 0, 0, 0);
-        for (double r = 1.0; r <= RADIUS; r += 0.6) {
+        double radius = blastRadius();
+        int ignite = igniteTicks();
+        for (double r = 1.0; r <= radius; r += 0.6) {
             int points = 32;
             for (int i = 0; i < points; i++) {
                 double ang = (Math.PI * 2) * i / points;
@@ -127,20 +131,20 @@ public final class HuTaoBoomListener implements Listener {
         }
 
         // урон всем живым в радиусе (тиммейты тоже получают), кроме автора
-        for (var ent : w.getNearbyEntities(center, RADIUS, RADIUS, RADIUS)) {
+        for (var ent : w.getNearbyEntities(center, radius, radius, radius)) {
             if (!(ent instanceof LivingEntity le) || !le.isValid() || le.isDead()) continue;
             if (owner != null && le.getUniqueId().equals(owner.getUniqueId())) continue; // автор не получает
 
             // небольшое поджигание
-            le.setFireTicks(Math.max(le.getFireTicks(), EXPLOSION_IGNITE));
+            le.setFireTicks(Math.max(le.getFireTicks(), ignite));
 
-            double total = 28.0; // твои 6 сердец
+            double total = blastDamage(); // твои 6 сердец
             double fin = reactions.applyOnTotalDamage(le, total,
                     ElementalReactions.Element.PYRO,
                     40,       // если реакции нет — повесим Pyro на ~2 c
                     true);    // если реакция была — «съедаем» обе ауры
             le.damage(fin, owner);
-            le.setFireTicks(Math.max(le.getFireTicks(), 20));
+            le.setFireTicks(Math.max(le.getFireTicks(), ignite));
         }
     }
 }

@@ -20,6 +20,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
+import org.money.money.meta.ClassRegistry;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,8 +39,6 @@ import java.util.UUID;
 public class IshigavaAuraListener implements Listener {
 
     private static final String NAME_OF_ISHIGAVA_AURA = "AURA";
-
-    private static final long AURA_COOLDOWN_MS = 2 * 60 * 1000L;
 
     private final Plugin plugin;
     private final Set<Player> activePlayers = new HashSet<>();
@@ -75,7 +74,7 @@ public class IshigavaAuraListener implements Listener {
                 player.sendActionBar(Component.text(sec + " sec"));
                 return;
             }
-            cooldownUntil.put(player.getUniqueId(), now + AURA_COOLDOWN_MS);
+            cooldownUntil.put(player.getUniqueId(), now + ClassRegistry.millis("ishigava", "aura", 120_000L));
             startAuraEffect(player);
         }
     }
@@ -103,12 +102,13 @@ public class IshigavaAuraListener implements Listener {
         // (so the ability isn't silently dead when testing without teams).
         Team playerTeam = getPlayerTeam(player);
 
+        final double healthLossThreshold = ClassRegistry.num("ishigava", "aura", "healthLossThreshold", 10.0);
         double[] initialHealth = {player.getHealth()};
-        double[] thresholdHealth = {Math.max(initialHealth[0] - 10, 0)};
+        double[] thresholdHealth = {Math.max(initialHealth[0] - healthLossThreshold, 0)};
 
         new BukkitRunnable() {
-            final int durationTicks = 20 * 20;
-            final double radius = 8.0;
+            final int durationTicks = ClassRegistry.numInt("ishigava", "aura", "durationTicks", 400);
+            final double radius = ClassRegistry.num("ishigava", "aura", "radius", 8.0);
             final Random random = new Random();
             final Particle.DustOptions dustOptions = new Particle.DustOptions(Color.fromRGB(0, 100, 100), 2.0F);
             int elapsedTicks = 0;
@@ -125,7 +125,7 @@ public class IshigavaAuraListener implements Listener {
 
                 if (currentHealth > initialHealth[0]) {
                     initialHealth[0] = currentHealth;
-                    thresholdHealth[0] = Math.min(currentHealth - 10, 20);
+                    thresholdHealth[0] = Math.min(currentHealth - healthLossThreshold, 20);
                 }
 
                 if (currentHealth <= thresholdHealth[0]) {

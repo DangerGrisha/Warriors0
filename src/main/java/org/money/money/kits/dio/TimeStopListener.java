@@ -22,6 +22,7 @@ import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.money.money.util.ItemModels;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -30,15 +31,15 @@ public final class TimeStopListener implements Listener {
 
     // тайминги
     private static final long WINDUP_TICKS = Math.round(20 * 3.9); // 3.9 c до стопа
-    private static final long FREEZE_TICKS = 20L * 5;              // 5 c стопа
+    // длительность стопа (тики) — берётся из ClassRegistry при использовании (def 100 = 5 c)
+    private static long freezeTicks() {
+        return org.money.money.meta.ClassRegistry.numInt("dio", "timestop", "freezeDurationTicks", 100);
+    }
 
     // визуал разгона
     private static final long FLICKER_PERIOD   = 6L;  // каждые 0.3 c
     private static final int  FLICKER_ON_TICKS = 5;   // импульс Blindness ~0.25 c
     private static final long DARKNESS_AT      = 20L * 3 + 10L; // ~3.5 c
-
-    // кулдаун возврата предмета
-    private static final long RETURN_AFTER_MS  = 120_000L; // 2 минуты
 
     // пробуем настоящий /tick freeze поверх нашей селективной заморозки
     private static final boolean USE_VANILLA_TICK_FREEZE = true;
@@ -74,6 +75,7 @@ public final class TimeStopListener implements Listener {
         ItemMeta im = it.getItemMeta();
         im.displayName(Component.text("TIME_STOP"));
         im.getPersistentDataContainer().set(KEY_TIME_STOP, PersistentDataType.BYTE, (byte)1);
+        ItemModels.apply(im, "dio_time");
         it.setItemMeta(im);
         return it;
     }
@@ -149,14 +151,15 @@ public final class TimeStopListener implements Listener {
 
         // потребляем предмет и ставим кулдаун/возврат
         if (!consumeOneTimeStop(p)) return;
-        long backAt = now + RETURN_AFTER_MS;
+        long returnAfterMs = org.money.money.meta.ClassRegistry.millis("dio", "timestop", 120_000L);
+        long backAt = now + returnAfterMs;
         cooldownUntilMs.put(p.getUniqueId(), backAt);
         Bukkit.getAsyncScheduler().runDelayed(plugin, task ->
                         Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
                             Player online = Bukkit.getPlayer(p.getUniqueId());
                             if (online != null && online.isOnline()) giveBackTimeStop(online);
                         }),
-                RETURN_AFTER_MS, TimeUnit.MILLISECONDS);
+                returnAfterMs, TimeUnit.MILLISECONDS);
 
         // звук пролога
         try {
@@ -173,7 +176,7 @@ public final class TimeStopListener implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             windingUp.remove(id);
             stopWindupVisuals(id);
-            startFreezeFor(p, FREEZE_TICKS);
+            startFreezeFor(p, freezeTicks());
         }, WINDUP_TICKS);
     }
 
@@ -205,7 +208,7 @@ public final class TimeStopListener implements Listener {
         windupFx.put(id, flicker);
 
         // плотная тьма за ~0.4с до стопа и до конца фриза
-        int darknessDur = (int)((WINDUP_TICKS - DARKNESS_AT) + FREEZE_TICKS + 2L);
+        int darknessDur = (int)((WINDUP_TICKS - DARKNESS_AT) + freezeTicks() + 2L);
         BukkitTask dark = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!owner.isOnline()) { stopWindupVisuals(id); return; }
             stopFlickerOnly(id);

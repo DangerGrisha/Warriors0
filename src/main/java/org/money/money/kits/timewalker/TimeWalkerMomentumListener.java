@@ -3,6 +3,9 @@ package org.money.money.kits.timewalker;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -22,6 +25,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -33,6 +37,10 @@ import java.util.*;
  * <p>RMB the Momentum item toggles the perk. While ON, moving in a single straight
  * direction ramps up a Speed effect (level 1..maxLevel). Stopping, turning sharply,
  * dying, going spectator or leaving to the lobby resets/disables it.
+ *
+ * <p>At level &gt;= {@code hulkLevel} (5) she enters the "Hulk" state: crashing into a wall
+ * smashes the block(s) ahead and costs 2 levels instead of a full stop. At level
+ * &gt;= {@code knockbackImmuneLevel} (8) she gains full knockback resistance until she drops below it.
  */
 public final class TimeWalkerMomentumListener implements Listener, KitResettable {
 
@@ -53,14 +61,6 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
     // Item marker
     private final NamespacedKey KEY_MOMENTUM_ITEM;
 
-    // Config tunables (read once in constructor)
-    private final int maxLevel;
-    private final double secondsPerLevel;
-    private final double turnResetDegrees;
-    private final double minMoveSpeed;
-    private final double fallDamageMultiplier;
-    private final double fallMomentumTicksPerDamage;
-
     // Active set (players with the perk toggled ON)
     private final Set<UUID> active = new HashSet<>();
 
@@ -73,6 +73,8 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
     private final Map<UUID, Long> lastStepTick = new HashMap<>();
     // Active foot (false=right, true=left) for alternating footprints.
     private final Map<UUID, Boolean> stepFoot = new HashMap<>();
+    // Players currently at the max "Hulk" state with full knockback resistance applied.
+    private final Set<UUID> knockbackImmune = new HashSet<>();
 
     // Single global repeating task
     private BukkitTask globalTask;
@@ -81,14 +83,27 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
         this.plugin = Objects.requireNonNull(plugin);
         this.KEY_MOMENTUM_ITEM = new NamespacedKey(plugin, "timewalker_momentum");
 
-        this.maxLevel = Math.max(1, plugin.getConfig().getInt("timewalker.momentum.max-level", 8));
-        this.secondsPerLevel = Math.max(0.05, plugin.getConfig().getDouble("timewalker.momentum.seconds-per-level", 0.9));
-        this.turnResetDegrees = plugin.getConfig().getDouble("timewalker.momentum.turn-reset-degrees", 60.0);
-        this.minMoveSpeed = plugin.getConfig().getDouble("timewalker.momentum.min-move-speed", 0.04);
-        this.fallDamageMultiplier = plugin.getConfig().getDouble("timewalker.momentum.fall-damage-multiplier", 0.5);
-        this.fallMomentumTicksPerDamage = plugin.getConfig().getDouble("timewalker.momentum.fall-momentum-ticks-per-damage", 4.0);
-
         startGlobalTask();
+    }
+
+    /* ===================== Registry reads (use-time, hot-reloadable) ===================== */
+
+    private static int maxLevel() {
+        return Math.max(1, ClassRegistry.numInt("timewalker", "momentum", "maxLevel", 8));
+    }
+
+    private static double secondsPerLevel() {
+        return Math.max(0.05, ClassRegistry.num("timewalker", "momentum", "secondsPerLevel", 0.9));
+    }
+
+    /** Level at which the "Hulk" state begins (can smash walls she crashes into). */
+    private static int hulkLevel() {
+        return Math.max(1, ClassRegistry.numInt("timewalker", "momentum", "hulkLevel", 5));
+    }
+
+    /** Level at which she becomes immune to knockback until she drops below it. */
+    private static int knockbackImmuneLevel() {
+        return Math.max(1, ClassRegistry.numInt("timewalker", "momentum", "knockbackImmuneLevel", 8));
     }
 
     /* ===================== Item ===================== */
@@ -158,6 +173,7 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
 
         p.removeScoreboardTag(TAG_MOMENTUM);
         p.removePotionEffect(PotionEffectType.SPEED);
+        setKnockbackImmune(p, false);
         if (wasActive && announce && p.isOnline()) {
             p.playSound(p.getLocation(), Sound.ENTITY_HORSE_STEP, 0.8f, 0.8f);
             p.sendMessage(Component.text("Momentum Drive: OFF", NamedTextColor.GRAY));
@@ -171,6 +187,7 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
         currentLevel.put(id, 0);
         lockedDirection.remove(id);
         p.removePotionEffect(PotionEffectType.SPEED);
+        setKnockbackImmune(p, false);
 
         if (playBreakFx) {
             p.playSound(p.getLocation(), Sound.ENTITY_HORSE_STEP_WOOD, 0.7f, 0.7f);
@@ -185,6 +202,7 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
         lastLocation.remove(id);
         lastStepTick.remove(id);
         stepFoot.remove(id);
+        knockbackImmune.remove(id);
     }
 
     /* ===================== Global ramp task ===================== */
@@ -242,9 +260,24 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
         double dz = now.getZ() - prev.getZ();
         double horizPerTick = Math.sqrt(dx * dx + dz * dz) / TASK_PERIOD_TICKS;
 
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        double minMoveSpeed = ClassRegistry.num("timewalker", "momentum", "minMoveSpeed", 0.04);
+        double turnResetDegrees = ClassRegistry.num("timewalker", "momentum", "turnResetDegrees", 60.0);
+
         if (horizPerTick < minMoveSpeed) {
+            int lvl = currentLevel.getOrDefault(id, 0);
+            // Hulk state: crashing into a wall smashes it (costs 2 levels) instead of a full stop.
+            // lockedDirection still holds the run heading at the impact tick.
+            if (lvl >= hulkLevel()) {
+                Vector run = lockedDirection.get(id);
+                if (run != null && breakWallAhead(p, run)) {
+                    hulkSmashFx(p);
+                    reduceLevel(p, 2);
+                    return; // smashed through — keep the reduced momentum, don't full-reset
+                }
+            }
             // Stopped -> reset (only play FX if we actually had momentum built up).
-            if (currentLevel.getOrDefault(id, 0) >= 1 || lockedDirection.containsKey(id)) {
+            if (lvl >= 1 || lockedDirection.containsKey(id)) {
                 resetRamp(p, true);
             }
             return;
@@ -275,11 +308,14 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
         accumulatorTicks.put(id, acc);
 
         double accSeconds = acc / 20.0;
-        int level = Math.min(maxLevel, 1 + (int) Math.floor(accSeconds / secondsPerLevel));
+        int level = Math.min(maxLevel(), 1 + (int) Math.floor(accSeconds / secondsPerLevel()));
         int prevLevel = currentLevel.getOrDefault(id, 0);
         currentLevel.put(id, level);
 
         if (level > prevLevel) momentumMilestone(p, prevLevel, level);
+
+        // Hulk max-state: full knockback immunity at/above the threshold, off below it.
+        setKnockbackImmune(p, level >= knockbackImmuneLevel());
 
         if (level >= 1) {
             int amp = level - 1; // level 1 -> Speed I (amp 0); level 8 -> Speed VIII (amp 7)
@@ -381,11 +417,13 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
         if (!active.contains(id)) return;
 
         double original = e.getDamage();
+        // Balance numbers read at use time so /warriors reload applies without restart.
         // Soften the landing (x0.5 by default).
-        e.setDamage(original * fallDamageMultiplier);
+        e.setDamage(original * ClassRegistry.num("timewalker", "momentum", "fallDamageMultiplier", 0.5));
 
         // Bigger fall -> more momentum.
-        double acc = accumulatorTicks.getOrDefault(id, 0.0) + original * fallMomentumTicksPerDamage;
+        double acc = accumulatorTicks.getOrDefault(id, 0.0)
+                + original * ClassRegistry.num("timewalker", "momentum", "fallMomentumTicksPerDamage", 4.0);
         accumulatorTicks.put(id, acc);
 
         // Prime the direction lock to current facing so continuing the run keeps the gained speed.
@@ -393,7 +431,7 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
         if (face.lengthSquared() > 1e-6) lockedDirection.put(id, face.normalize());
 
         // Apply the new level instantly.
-        int level = Math.min(maxLevel, 1 + (int) Math.floor((acc / 20.0) / secondsPerLevel));
+        int level = Math.min(maxLevel(), 1 + (int) Math.floor((acc / 20.0) / secondsPerLevel()));
         currentLevel.put(id, level);
         if (level >= 1) {
             p.addPotionEffect(new PotionEffect(
@@ -404,6 +442,98 @@ public final class TimeWalkerMomentumListener implements Listener, KitResettable
             p.getWorld().spawnParticle(Particle.SMOKE, p.getLocation().add(0, 0.1, 0), 14, 0.35, 0.05, 0.35, 0.02);
             p.sendActionBar(Component.text("Momentum: " + roman(level), NamedTextColor.AQUA));
         }
+    }
+
+    /* ===================== Hulk state (level >= hulkLevel) ===================== */
+
+    /**
+     * Toggle full knockback resistance for the max "Hulk" state via the KNOCKBACK_RESISTANCE
+     * attribute (1.0 = no knockback from hits, 0.0 = default). Turning OFF always clears the
+     * attribute even if our set already forgot the player, so the boosted value can never leak
+     * into the player's NBT after stop/turn/death/quit/reset.
+     */
+    private void setKnockbackImmune(Player p, boolean on) {
+        if (p == null) return;
+        UUID id = p.getUniqueId();
+        AttributeInstance attr = p.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+
+        if (on) {
+            if (attr != null) attr.setBaseValue(1.0);
+            if (knockbackImmune.add(id)) {
+                p.playSound(p.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.9f, 0.5f);
+                p.getWorld().spawnParticle(Particle.CRIT, p.getLocation().add(0, 1, 0), 20, 0.4, 0.6, 0.4, 0.1);
+            }
+        } else {
+            if (attr != null && attr.getBaseValue() != 0.0) attr.setBaseValue(0.0);
+            knockbackImmune.remove(id);
+        }
+    }
+
+    /** Drop the momentum level by {@code amount} (min 0), realign the accumulator, refresh speed + immunity. */
+    private void reduceLevel(Player p, int amount) {
+        UUID id = p.getUniqueId();
+        int newLvl = Math.max(0, currentLevel.getOrDefault(id, 0) - amount);
+        currentLevel.put(id, newLvl);
+
+        // Re-seat the accumulator at the start of the new level band so speed must be rebuilt.
+        accumulatorTicks.put(id, newLvl <= 0 ? 0.0 : (newLvl - 1) * secondsPerLevel() * 20.0);
+
+        if (newLvl >= 1) {
+            p.addPotionEffect(new PotionEffect(
+                    PotionEffectType.SPEED, SPEED_REFRESH_TICKS, newLvl - 1, false, false, false));
+            p.sendActionBar(Component.text("Momentum: " + roman(newLvl), NamedTextColor.AQUA));
+        } else {
+            p.removePotionEffect(PotionEffectType.SPEED);
+        }
+        setKnockbackImmune(p, newLvl >= knockbackImmuneLevel());
+    }
+
+    /** FX when the Hulk smashes through a wall. */
+    private void hulkSmashFx(Player p) {
+        p.playSound(p.getLocation(), Sound.ENTITY_RAVAGER_ROAR, 0.7f, 1.4f);
+        p.playSound(p.getLocation(), Sound.BLOCK_ANVIL_LAND, 0.5f, 0.8f);
+        p.getWorld().spawnParticle(Particle.EXPLOSION, p.getLocation().add(0, 1, 0), 1, 0, 0, 0, 0);
+    }
+
+    /**
+     * Break the (up to 2-tall) wall block directly ahead of the player, snapping to the dominant
+     * cardinal axis of {@code runDir}. Returns true if any block was destroyed.
+     */
+    private boolean breakWallAhead(Player p, Vector runDir) {
+        double ax = Math.abs(runDir.getX());
+        double az = Math.abs(runDir.getZ());
+        int dx = 0, dz = 0;
+        if (ax >= az) dx = runDir.getX() >= 0 ? 1 : -1;
+        else          dz = runDir.getZ() >= 0 ? 1 : -1;
+        if (dx == 0 && dz == 0) return false;
+
+        Block feet = p.getLocation().getBlock().getRelative(dx, 0, dz);
+        Block head = feet.getRelative(0, 1, 0);
+        boolean broke = smashBlock(feet);
+        broke |= smashBlock(head);
+        return broke;
+    }
+
+    /** Destroy one wall block (no drops) if it is solid, breakable and not protected. */
+    private boolean smashBlock(Block b) {
+        Material t = b.getType();
+        if (t.isAir() || b.isLiquid() || !t.isSolid()) return false;
+        if (t.getHardness() < 0) return false;      // bedrock / barrier — unbreakable
+        if (isProtectedBlock(t)) return false;
+
+        World w = b.getWorld();
+        w.spawnParticle(Particle.BLOCK, b.getLocation().add(0.5, 0.5, 0.5), 20, 0.3, 0.3, 0.3, 0.0, b.getBlockData());
+        w.playSound(b.getLocation(), Sound.BLOCK_STONE_BREAK, 1.0f, 0.7f);
+        b.setType(Material.AIR, false); // no drops, no physics
+        return true;
+    }
+
+    private static boolean isProtectedBlock(Material t) {
+        if (t == Material.BEDROCK || t == Material.BARRIER) return true;
+        if (t == Material.END_PORTAL || t == Material.END_PORTAL_FRAME) return true;
+        if (t == Material.REINFORCED_DEEPSLATE) return true;
+        String n = t.name();
+        return n.endsWith("COMMAND_BLOCK") || n.contains("STRUCTURE") || n.equals("JIGSAW");
     }
 
     /* ===================== Cleanup / disable triggers ===================== */

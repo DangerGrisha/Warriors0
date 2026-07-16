@@ -26,6 +26,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -64,28 +65,11 @@ public final class BlastGlovesListener implements Listener, KitResettable {
     private final NamespacedKey KEY_GLOVES;
     private final NamespacedKey KEY_MODE;
 
-    // ===== Config (read once) =====
+    // ===== Config (read once; non-balance toggles only — balance numbers come from ClassRegistry at use time) =====
     private final boolean switchWithF;
-
-    // Wall Blast
-    private final double wallRange;
-    private final double wallRadius;
-    private final double wallDamage;
-    private final double wallKnockback;
-    private final int wallCooldownTicks;
     private final boolean wallBreakBlocks;
-
-    // Air Burst
-    private final double airDistance;
-    private final double airRadius;
-    private final double airDamage;
-    private final double airSelfDamageMult;
-    private final double airKnockback;
-    private final int airCooldownTicks;
     private final boolean airBreakBlocks;
     private final boolean airRequireClearPath;
-
-    private final double selfKnockbackMultiplier;
 
     // ===== Per-player cooldown state (one shared cooldown per player) =====
     private final Map<UUID, Long> cooldownMap = new HashMap<>();
@@ -99,24 +83,14 @@ public final class BlastGlovesListener implements Listener, KitResettable {
         this.KEY_MODE = new NamespacedKey(plugin, "blastborn_glove_mode");
 
         this.switchWithF = plugin.getConfig().getBoolean("classes.blastborn.gloves.switchWithF", true);
-
-        this.wallRange = plugin.getConfig().getDouble("classes.blastborn.gloves.wallBlast.range", 4.0);
-        this.wallRadius = plugin.getConfig().getDouble("classes.blastborn.gloves.wallBlast.radius", 3.0);
-        this.wallDamage = plugin.getConfig().getDouble("classes.blastborn.gloves.wallBlast.damage", 0.0);
-        this.wallKnockback = plugin.getConfig().getDouble("classes.blastborn.gloves.wallBlast.knockback", 1.6);
-        this.wallCooldownTicks = Math.max(0, plugin.getConfig().getInt("classes.blastborn.gloves.wallBlast.cooldownTicks", 8));
         this.wallBreakBlocks = plugin.getConfig().getBoolean("classes.blastborn.gloves.wallBlast.breakBlocks", false);
-
-        this.airDistance = plugin.getConfig().getDouble("classes.blastborn.gloves.airBurst.distance", 3.0);
-        this.airRadius = plugin.getConfig().getDouble("classes.blastborn.gloves.airBurst.radius", 3.2);
-        this.airDamage = plugin.getConfig().getDouble("classes.blastborn.gloves.airBurst.damage", 6.0);
-        this.airSelfDamageMult = plugin.getConfig().getDouble("classes.blastborn.gloves.airBurst.selfDamageMultiplier", 0.75);
-        this.airKnockback = plugin.getConfig().getDouble("classes.blastborn.gloves.airBurst.knockback", 1.8);
-        this.airCooldownTicks = Math.max(0, plugin.getConfig().getInt("classes.blastborn.gloves.airBurst.cooldownTicks", 8));
         this.airBreakBlocks = plugin.getConfig().getBoolean("classes.blastborn.gloves.airBurst.breakBlocks", false);
         this.airRequireClearPath = plugin.getConfig().getBoolean("classes.blastborn.gloves.airBurst.requireClearAirPath", true);
+    }
 
-        this.selfKnockbackMultiplier = plugin.getConfig().getDouble("classes.blastborn.selfKnockbackMultiplier", 2.25);
+    /** Caster knockback multiplier (class-wide passive value, hot-reloadable). */
+    private static double selfKnockbackMultiplier() {
+        return ClassRegistry.num("blastborn", "selfdestruction", "selfKnockbackMultiplier", 2.25);
     }
 
     /* ================== Item ================== */
@@ -218,7 +192,8 @@ public final class BlastGlovesListener implements Listener, KitResettable {
         long now = System.currentTimeMillis();
 
         int mode = getMode(main);
-        int cooldownTicks = mode == MODE_AIR ? airCooldownTicks : wallCooldownTicks;
+        // Both modes share the single "gloves" cooldown key; read at use time so /warriors reload applies.
+        int cooldownTicks = Math.max(0, ClassRegistry.ticks("blastborn", "gloves", 8));
         long cooldownMs = cooldownTicks * 50L;
 
         if (cooldownMap.containsKey(id)) {
@@ -251,6 +226,12 @@ public final class BlastGlovesListener implements Listener, KitResettable {
     /* ================== Wall Blast (mode 0) ================== */
 
     private boolean wallBlast(Player p) {
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        final double wallRange = ClassRegistry.num("blastborn", "gloves", "wallRange", 4.0);
+        final double wallRadius = ClassRegistry.num("blastborn", "gloves", "wallRadius", 3.0);
+        final double wallDamage = ClassRegistry.num("blastborn", "gloves", "wallDamage", 0.0);
+        final double wallKnockback = ClassRegistry.num("blastborn", "gloves", "wallKnockback", 1.6);
+
         RayTraceResult rr = ExplosionUtil.rayTrace(p, wallRange);
         if (rr == null || rr.getHitBlock() == null) {
             p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.4f, 0.6f);
@@ -263,7 +244,7 @@ public final class BlastGlovesListener implements Listener, KitResettable {
         ExplosionUtil.visualExplosion(center, 2.5f, false);
         // Push EVERYONE including the caster — this is the mobility tool, and the caster is flung
         // several times harder (selfKnockbackMultiplier) so he can ricochet off walls.
-        ExplosionUtil.knockbackPlayers(center, wallRadius, wallKnockback, 0.4, p, true, false, selfKnockbackMultiplier);
+        ExplosionUtil.knockbackPlayers(center, wallRadius, wallKnockback, 0.4, p, true, false, selfKnockbackMultiplier());
         if (wallDamage > 0) {
             ExplosionUtil.damagePlayers(center, wallRadius, wallDamage, p, false, 1.0, false);
         }
@@ -276,6 +257,13 @@ public final class BlastGlovesListener implements Listener, KitResettable {
     /* ================== Air Burst (mode 1) ================== */
 
     private boolean airBurst(Player p) {
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        final double airDistance = ClassRegistry.num("blastborn", "gloves", "airDistance", 3.0);
+        final double airRadius = ClassRegistry.num("blastborn", "gloves", "airRadius", 3.2);
+        final double airDamage = ClassRegistry.num("blastborn", "gloves", "airDamage", 6.0);
+        final double airSelfDamageMult = ClassRegistry.num("blastborn", "gloves", "airSelfDamageMultiplier", 0.75);
+        final double airKnockback = ClassRegistry.num("blastborn", "gloves", "airKnockback", 1.8);
+
         if (airRequireClearPath && !ExplosionUtil.hasClearPath(p, airDistance)) {
             p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.4f, 0.6f);
             return false;
@@ -290,7 +278,7 @@ public final class BlastGlovesListener implements Listener, KitResettable {
 
         ExplosionUtil.visualExplosion(center, 3f, true);
         // Push everyone incl. self — the caster is launched several times harder for flight.
-        ExplosionUtil.knockbackPlayers(center, airRadius, airKnockback, 0.5, p, true, false, selfKnockbackMultiplier);
+        ExplosionUtil.knockbackPlayers(center, airRadius, airKnockback, 0.5, p, true, false, selfKnockbackMultiplier());
         // Damage enemies + the caster (reduced); never hit allies.
         ExplosionUtil.damagePlayers(center, airRadius, airDamage, p, true, airSelfDamageMult, false);
         if (airBreakBlocks) {

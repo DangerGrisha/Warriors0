@@ -14,6 +14,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.EquipmentSlotGroup;
@@ -27,6 +28,7 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.money.money.util.ItemModels;
 
 import javax.swing.*;
 import java.util.*;
@@ -38,23 +40,28 @@ public final class SaberLightExcaliburListener implements Listener {
        CONFIG (easy to tune)
        ========================= */
 
-    // Base values similar to diamond sword feel
-    private static final double BASE_DAMAGE = 7.0;          // Diamond sword-like base
-    private static final double BASE_ATTACK_SPEED = 1.6;    // Vanilla sword-like speed
+    // Base values similar to diamond sword feel (read from ClassRegistry at use time)
+    private static double baseDamage() { return org.money.money.meta.ClassRegistry.num("saberlight", "excalibur", "baseDamage", 7.0); }
+    private static double baseAttackSpeed() { return org.money.money.meta.ClassRegistry.num("saberlight", "excalibur", "baseAttackSpeed", 1.6); }
 
     // Souls scaling
-    private static final double DAMAGE_PER_SOUL = 0.5;
-    private static final double HEAVY_PER_SOUL  = 0.1;      // Reduces attack speed by 0.1 per soul
+    private static double damagePerSoul() { return org.money.money.meta.ClassRegistry.num("saberlight", "excalibur", "damagePerSoul", 0.5); }
+    private static double attackSpeedPerSoul() { return org.money.money.meta.ClassRegistry.num("saberlight", "excalibur", "attackSpeedPerSoul", 0.1); }
     private static final double MIN_ATTACK_SPEED = 0.4;     // Safety clamp
 
+    // Heaviness: each soul weighs the blade down -> slower movement while held.
+    private static double movementPenaltyPerSoul() { return org.money.money.meta.ClassRegistry.num("saberlight", "excalibur", "movementPenaltyPerSoul", 0.0015); }
+    private static final double PLAYER_BASE_MOVE_SPEED = 0.1; // vanilla player MOVEMENT_SPEED base
+    private static final double MIN_MOVEMENT_SPEED = 0.045;   // floor so high souls never fully immobilize
+
     // Guard break system
-    private static final double GUARD_BREAK_THRESHOLD = 12.0;
-    private static final long   GUARD_BREAK_TICKS = 20L * 5;      // 5 seconds
+    private static double guardBreakThreshold() { return org.money.money.meta.ClassRegistry.num("saberlight", "excalibur", "guardBreakThreshold", 12.0); }
+    private static long guardBreakDurationTicks() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "excalibur", "guardBreakDurationTicks", 100); }
     private static final long   GUARD_REGEN_PERIOD_TICKS = 20L * 2; // every 2 sec
     private static final double GUARD_REGEN_AMOUNT = 1.0;         // -1 blocked damage
 
     // How much shield blocks (custom % for your system)
-    private static final double BLOCK_PERCENT = 0.80; // 80% blocked, 20% passes through
+    private static double blockPercent() { return org.money.money.meta.ClassRegistry.num("saberlight", "excalibur", "blockPercent", 0.80); }
 
     // Direction check for frontal blocking
     private static final double FRONT_BLOCK_DOT = 0.15; // >0 means attack roughly from front hemisphere
@@ -87,6 +94,9 @@ public final class SaberLightExcaliburListener implements Listener {
     private final Map<UUID, Long> lastExcaliburHitAt = new ConcurrentHashMap<>();
     private static final long LAST_HIT_WINDOW_MS = 4000L;
 
+    // Player -> банк душ, переживающий смерть→респавн (души не теряются — копятся в мече).
+    private final Map<UUID, Integer> soulBank = new ConcurrentHashMap<>();
+
     public SaberLightExcaliburListener(Plugin plugin) {
         this.plugin = Objects.requireNonNull(plugin);
 
@@ -111,6 +121,7 @@ public final class SaberLightExcaliburListener implements Listener {
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE);
         meta.setUnbreakable(true);
 
+        ItemModels.apply(meta, "saber_lexcalibur");
         it.setItemMeta(meta);
 
         // Apply display + attributes based on souls = 0
@@ -157,7 +168,7 @@ public final class SaberLightExcaliburListener implements Listener {
         // Excalibur custom damage scaling (optional but recommended)
         // We override damage to match our soul scaling.
         int souls = getSouls(main);
-        double damage = BASE_DAMAGE + (souls * DAMAGE_PER_SOUL);
+        double damage = baseDamage() + (souls * damagePerSoul());
         e.setDamage(damage);
 
         // Excalibur "heavy" feel via attack speed is handled in attributes on the item itself
@@ -204,6 +215,9 @@ public final class SaberLightExcaliburListener implements Listener {
         shieldStunUntil.remove(victimId);
         hideGuardBar(victim);
 
+        // Души жертвы не теряются после смерти — снимок + меч с душами не ронять.
+        bankSoulsOnDeath(victim, e);
+
         if (attackerId == null || hitAt == null) return;
         if (System.currentTimeMillis() - hitAt > LAST_HIT_WINDOW_MS) return;
 
@@ -211,6 +225,58 @@ public final class SaberLightExcaliburListener implements Listener {
         if (attacker == null || !attacker.isOnline()) return;
 
         addSoul(attacker, "Kill");
+    }
+
+    /* =========================
+       Souls persist across death (накопление в мече)
+       ========================= */
+
+    /** Снимок душ жертвы перед дропом + меч с душами не ронять (вернём на респавне). */
+    private void bankSoulsOnDeath(Player victim, PlayerDeathEvent e) {
+        int souls = 0;
+        for (ItemStack it : victim.getInventory().getContents()) if (isExcalibur(it)) souls = Math.max(souls, getSouls(it));
+        ItemStack off = victim.getInventory().getItemInOffHand();
+        if (isExcalibur(off)) souls = Math.max(souls, getSouls(off));
+        for (ItemStack it : e.getDrops()) if (isExcalibur(it)) souls = Math.max(souls, getSouls(it));
+        if (souls > 0) soulBank.put(victim.getUniqueId(), souls);
+        e.getDrops().removeIf(this::isExcalibur);
+    }
+
+    /** На респавне восстановить накопленные души на (заново выданный) меч. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onRespawnRestoreSouls(PlayerRespawnEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        Integer banked = soulBank.get(id);
+        if (banked == null || banked <= 0) return;
+        scheduleSoulRestore(id, banked, 0);
+    }
+
+    /** Подождать выдачу Excalibur после респавна и проставить накопленные души (ретраи ~10с). */
+    private void scheduleSoulRestore(UUID id, int souls, int attempt) {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null || !p.isOnline()) { soulBank.remove(id); return; }
+            if (restoreSoulsTo(p, souls)) soulBank.remove(id);
+            else if (attempt < 40) scheduleSoulRestore(id, souls, attempt + 1);
+            else soulBank.remove(id);
+        }, 5L);
+    }
+
+    /** Проставить души на Excalibur игрока, где бы он ни лежал. true — нашли и обновили. */
+    private boolean restoreSoulsTo(Player p, int souls) {
+        ItemStack[] store = p.getInventory().getStorageContents();
+        for (int i = 0; i < store.length; i++) {
+            if (isExcalibur(store[i])) {
+                if (getSouls(store[i]) < souls) { updateExcaliburSouls(store[i], souls); p.getInventory().setItem(i, store[i]); }
+                return true;
+            }
+        }
+        ItemStack off = p.getInventory().getItemInOffHand();
+        if (isExcalibur(off)) {
+            if (getSouls(off) < souls) { updateExcaliburSouls(off, souls); p.getInventory().setItemInOffHand(off); }
+            return true;
+        }
+        return false;
     }
 
     /* =========================
@@ -252,7 +318,7 @@ public final class SaberLightExcaliburListener implements Listener {
         double incoming = e.getDamage();
         if (incoming <= 0.0) return;
 
-        double blocked = incoming * BLOCK_PERCENT;
+        double blocked = incoming * blockPercent();
         double passed = Math.max(0.0, incoming - blocked);
 
         // Apply reduced damage
@@ -270,7 +336,7 @@ public final class SaberLightExcaliburListener implements Listener {
         showGuardBar(defender);
 
         // Break check
-        if (now >= GUARD_BREAK_THRESHOLD) {
+        if (now >= guardBreakThreshold()) {
             triggerGuardBreak(defender);
         }
     }
@@ -304,11 +370,11 @@ public final class SaberLightExcaliburListener implements Listener {
     private void triggerGuardBreak(Player p) {
         UUID id = p.getUniqueId();
 
-        shieldStunUntil.put(id, System.currentTimeMillis() + (GUARD_BREAK_TICKS * 50L));
-        blockedDamage.put(id, GUARD_BREAK_THRESHOLD); // clamp for display before reset
+        shieldStunUntil.put(id, System.currentTimeMillis() + (guardBreakDurationTicks() * 50L));
+        blockedDamage.put(id, guardBreakThreshold()); // clamp for display before reset
 
         // Apply vanilla item cooldown visual on shield (optional, nice UX)
-        p.setCooldown(Material.SHIELD, (int) GUARD_BREAK_TICKS);
+        p.setCooldown(Material.SHIELD, (int) guardBreakDurationTicks());
 
         try {
             p.clearActiveItem(); // Paper API, if available in your version
@@ -331,7 +397,7 @@ public final class SaberLightExcaliburListener implements Listener {
             showGuardBar(p); // should show 0/20
             p.sendActionBar(Component.text("§aShield restored §7(0/20)"));
             p.playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.5f, 1.4f);
-        }, GUARD_BREAK_TICKS);
+        }, guardBreakDurationTicks());
     }
 
     private boolean isShieldStunned(Player p) {
@@ -380,7 +446,7 @@ public final class SaberLightExcaliburListener implements Listener {
         if (!isSaberLight(p)) return;
 
         double value = blockedDamage.getOrDefault(p.getUniqueId(), 0.0);
-        String text = "§b" + format1(value) + "§7/§f" + format1(GUARD_BREAK_THRESHOLD);
+        String text = "§b" + format1(value) + "§7/§f" + format1(guardBreakThreshold());
 
         // EXP BAR / LEVEL DISABLED (as requested)
         // p.setLevel(...)
@@ -434,8 +500,9 @@ public final class SaberLightExcaliburListener implements Listener {
         // Lore (optional but useful)
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("§7Souls: §6" + souls));
-        lore.add(Component.text("§7Damage: §c" + format1(BASE_DAMAGE + souls * DAMAGE_PER_SOUL)));
+        lore.add(Component.text("§7Damage: §c" + format1(baseDamage() + souls * damagePerSoul())));
         lore.add(Component.text("§7Attack Speed: §b" + format1(calcAttackSpeed(souls))));
+        lore.add(Component.text("§7Weight: §8-" + weightPercent(souls) + "% speed"));
         lore.add(Component.text("§8Blocks damage and can break guard"));
         meta.lore(lore);
 
@@ -443,10 +510,11 @@ public final class SaberLightExcaliburListener implements Listener {
         try {
             meta.removeAttributeModifier(Attribute.ATTACK_DAMAGE);
             meta.removeAttributeModifier(Attribute.ATTACK_SPEED);
+            meta.removeAttributeModifier(Attribute.MOVEMENT_SPEED);
         } catch (Throwable ignored) {}
 
         // Apply attack damage and speed in MAIN_HAND
-        double damage = BASE_DAMAGE + (souls * DAMAGE_PER_SOUL);
+        double damage = baseDamage() + (souls * damagePerSoul());
         double atkSpeed = calcAttackSpeed(souls);
 
         AttributeModifier dmgMod = new AttributeModifier(
@@ -466,9 +534,22 @@ public final class SaberLightExcaliburListener implements Listener {
         meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, dmgMod);
         meta.addAttributeModifier(Attribute.ATTACK_SPEED, speedMod);
 
+        // Heaviness: each soul makes the blade heavier -> slower movement while held (clamped).
+        double movePenalty = Math.min(souls * movementPenaltyPerSoul(), PLAYER_BASE_MOVE_SPEED - MIN_MOVEMENT_SPEED);
+        if (movePenalty > 0) {
+            AttributeModifier weightMod = new AttributeModifier(
+                    new NamespacedKey(plugin, "excalibur_weight"),
+                    -movePenalty,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    EquipmentSlotGroup.MAINHAND
+            );
+            meta.addAttributeModifier(Attribute.MOVEMENT_SPEED, weightMod);
+        }
+
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE);
         meta.setUnbreakable(true);
 
+        ItemModels.apply(meta, "saber_lexcalibur");
         it.setItemMeta(meta);
     }
 
@@ -480,8 +561,14 @@ public final class SaberLightExcaliburListener implements Listener {
     }
 
     private double calcAttackSpeed(int souls) {
-        double v = BASE_ATTACK_SPEED - (souls * HEAVY_PER_SOUL);
+        double v = baseAttackSpeed() - (souls * attackSpeedPerSoul());
         return Math.max(MIN_ATTACK_SPEED, v);
+    }
+
+    /** Movement-speed penalty as a percent of base speed, for lore display. */
+    private int weightPercent(int souls) {
+        double pen = Math.min(souls * movementPenaltyPerSoul(), PLAYER_BASE_MOVE_SPEED - MIN_MOVEMENT_SPEED);
+        return (int) Math.round(pen / PLAYER_BASE_MOVE_SPEED * 100.0);
     }
 
     /* =========================

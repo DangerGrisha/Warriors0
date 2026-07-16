@@ -27,6 +27,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -54,18 +55,8 @@ public final class SweatMachineGunListener implements Listener, KitResettable {
     private final NamespacedKey KEY_GUN;
     private final NamespacedKey KEY_BULLET;
 
-    // ===== Config (read once) =====
-    private final int count;
-    private final int fireIntervalTicks;
-    private final double projectileSpeed;
-    private final double spread;
-    private final double explosionRadius;
-    private final double damage;
-    private final double knockback;
-    private final long cooldownMs;
-    private final int maxLifeTicks;
+    // ===== Config (read once; non-balance toggles only — balance numbers come from ClassRegistry at use time) =====
     private final boolean breakBlocks;
-    private final int selfDestructionGain;
     private final boolean allowDuringUltimate;
 
     // ===== State =====
@@ -80,18 +71,7 @@ public final class SweatMachineGunListener implements Listener, KitResettable {
         this.KEY_GUN = new NamespacedKey(plugin, "blastborn_machinegun");
         this.KEY_BULLET = new NamespacedKey(plugin, "blastborn_mg_bullet");
 
-        this.count = Math.max(1, plugin.getConfig().getInt("classes.blastborn.machineGun.count", 20));
-        this.fireIntervalTicks = Math.max(1, plugin.getConfig().getInt("classes.blastborn.machineGun.fireIntervalTicks", 2));
-        this.projectileSpeed = plugin.getConfig().getDouble("classes.blastborn.machineGun.projectileSpeed", 2.2);
-        this.spread = plugin.getConfig().getDouble("classes.blastborn.machineGun.spread", 0.12);
-        this.explosionRadius = plugin.getConfig().getDouble("classes.blastborn.machineGun.explosionRadius", 2.5);
-        this.damage = plugin.getConfig().getDouble("classes.blastborn.machineGun.damage", 6.0);
-        this.knockback = plugin.getConfig().getDouble("classes.blastborn.machineGun.knockback", 0.9);
-        int cdTicks = Math.max(0, plugin.getConfig().getInt("classes.blastborn.machineGun.cooldownTicks", 1000));
-        this.cooldownMs = cdTicks * 50L;
-        this.maxLifeTicks = Math.max(5, plugin.getConfig().getInt("classes.blastborn.machineGun.maxLifeTicks", 40));
         this.breakBlocks = plugin.getConfig().getBoolean("classes.blastborn.machineGun.breakBlocks", false);
-        this.selfDestructionGain = plugin.getConfig().getInt("classes.blastborn.machineGun.selfDestructionGain", 0);
         this.allowDuringUltimate = plugin.getConfig().getBoolean("classes.blastborn.machineGun.allowDuringUltimate", true);
     }
 
@@ -137,6 +117,8 @@ public final class SweatMachineGunListener implements Listener, KitResettable {
         }
 
         long now = System.currentTimeMillis();
+        // Cooldown read at use time so /warriors reload applies without restart.
+        long cooldownMs = Math.max(0, ClassRegistry.ticks("blastborn", "machinegun", 1000)) * 50L;
         if (cooldownMap.containsKey(id)) {
             long passed = now - cooldownMap.get(id);
             if (passed < cooldownMs) {
@@ -155,6 +137,10 @@ public final class SweatMachineGunListener implements Listener, KitResettable {
         final UUID id = p.getUniqueId();
         BukkitTask prev = burstTasks.remove(id);
         if (prev != null) prev.cancel();
+
+        // Balance numbers read at use time (per burst) so /warriors reload applies without restart.
+        final int count = Math.max(1, ClassRegistry.numInt("blastborn", "machinegun", "projectileCount", 20));
+        final int fireIntervalTicks = Math.max(1, ClassRegistry.numInt("blastborn", "machinegun", "fireIntervalTicks", 2));
 
         BukkitTask task = new BukkitRunnable() {
             int fired = 0;
@@ -176,6 +162,10 @@ public final class SweatMachineGunListener implements Listener, KitResettable {
     }
 
     private void fireBullet(Player p) {
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        final double spread = ClassRegistry.num("blastborn", "machinegun", "spread", 0.12);
+        final double projectileSpeed = ClassRegistry.num("blastborn", "machinegun", "projectileSpeed", 2.2);
+
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         Vector dir = p.getEyeLocation().getDirection().normalize();
         dir.add(new Vector((rnd.nextDouble() - 0.5) * spread,
@@ -202,6 +192,7 @@ public final class SweatMachineGunListener implements Listener, KitResettable {
 
             @Override
             public void run() {
+                int maxLifeTicks = Math.max(5, ClassRegistry.numInt("blastborn", "machinegun", "maxLifeTicks", 40));
                 Player owner = (sb.getShooter() instanceof Player ps && ps.isOnline()) ? ps : null;
                 if (!sb.isValid() || sb.isDead() || !liveBullets.contains(bid)
                         || owner == null || !KitSession.isInGame(owner) || t >= maxLifeTicks) {
@@ -217,6 +208,7 @@ public final class SweatMachineGunListener implements Listener, KitResettable {
         }.runTaskTimer(plugin, 1L, 1L);
         reapTasks.put(bid, reaper);
 
+        int selfDestructionGain = ClassRegistry.numInt("blastborn", "machinegun", "selfDestructionGain", 0);
         if (selfDestructionGain > 0) manager.addPoints(p, selfDestructionGain);
     }
 
@@ -245,6 +237,11 @@ public final class SweatMachineGunListener implements Listener, KitResettable {
 
         // Never detonate in the lobby / after the game ended.
         if (shooter == null || !KitSession.isInGame(shooter)) return;
+
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        final double explosionRadius = ClassRegistry.num("blastborn", "machinegun", "explosionRadius", 2.5);
+        final double damage = ClassRegistry.num("blastborn", "machinegun", "damage", 6.0);
+        final double knockback = ClassRegistry.num("blastborn", "machinegun", "knockback", 0.9);
 
         ExplosionUtil.visualExplosion(at, 1.6f, true);
         ExplosionUtil.knockbackPlayers(at, explosionRadius, knockback, 0.3, shooter, true, false);

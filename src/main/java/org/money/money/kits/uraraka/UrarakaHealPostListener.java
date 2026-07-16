@@ -23,10 +23,10 @@ import java.util.*;
 
 public final class UrarakaHealPostListener implements Listener {
 
-    private static final double RADIUS = 10.0;
-    private static final long   HEAL_PERIOD = 20L * 5;  // каждые 5с
+    private static double RADIUS() { return org.money.money.meta.ClassRegistry.num("uraraka", "healpost", "radius", 10.0); }
+    private static long HEAL_PERIOD() { return org.money.money.meta.ClassRegistry.numInt("uraraka", "healpost", "healPeriodTicks", 100); }  // каждые 5с
     private static final long   WATCH_PERIOD = 20L;     // проверка блока раз в 1с
-    private static final double HEAL_AMOUNT = 4.0;      // 2 сердечка
+    private static double HEAL_AMOUNT() { return org.money.money.meta.ClassRegistry.num("uraraka", "healpost", "healAmount", 4.0); }      // 2 сердечка
 
     private final Plugin plugin;
     private final NamespacedKey KEY_HEAL_POST; // метка предмета
@@ -86,7 +86,7 @@ public final class UrarakaHealPostListener implements Listener {
             Player pOwner = Bukkit.getPlayer(owner.getUniqueId());
             if (pOwner == null || !pOwner.isOnline() || !as.isValid()) return;
 
-            Collection<Entity> nearby = as.getWorld().getNearbyEntities(as.getLocation(), RADIUS, RADIUS, RADIUS);
+            Collection<Entity> nearby = as.getWorld().getNearbyEntities(as.getLocation(), RADIUS(), RADIUS(), RADIUS());
             for (Entity ent : nearby) {
                 if (!(ent instanceof Player pl)) continue;
                 if (pl.isDead()) continue;
@@ -94,11 +94,11 @@ public final class UrarakaHealPostListener implements Listener {
 
                 double max = Optional.ofNullable(pl.getAttribute(Attribute.MAX_HEALTH))
                         .map(a -> a.getValue()).orElse(20.0);
-                pl.setHealth(Math.min(max, pl.getHealth() + HEAL_AMOUNT));
+                pl.setHealth(Math.min(max, pl.getHealth() + HEAL_AMOUNT()));
                 pl.getWorld().spawnParticle(Particle.HEART, pl.getLocation().add(0, 1.4, 0),
                         6, 0.5, 0.5, 0.5, 0.0);
             }
-        }, HEAL_PERIOD, HEAL_PERIOD);
+        }, HEAL_PERIOD(), HEAL_PERIOD());
 
         // сторож: жив ли блок
         BukkitTask watch = Bukkit.getScheduler().runTaskTimer(plugin, () -> {

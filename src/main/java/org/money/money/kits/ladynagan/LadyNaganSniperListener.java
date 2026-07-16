@@ -38,7 +38,9 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
+import org.money.money.util.ItemModels;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,13 +56,13 @@ import java.util.UUID;
  * <ul>
  *   <li>Базовый предмет — палка «T-742K Mori» (опущенная модель). ПКМ — поднять прицел:
  *       надевается тыква-шлем (прицел в ресурспаке), в руке заряженный арбалет «T-742K Mori»,
- *       накладывается замедление. Повторный ПКМ (без редиректа) — опустить.</li>
- *   <li>ЛКМ в прицеле — выстрел медленной невидимой пулей (урон {@value #DAMAGE_NORMAL}).</li>
- *   <li>Пока ВАША пуля летит и рядом с ней враг/не-союзник — ПКМ доворачивает пулю на врага
- *       (один раз на пулю).</li>
+ *       накладывается замедление. ПКМ в прицеле — опустить.</li>
+ *   <li>ЛКМ в прицеле — выстрел медленной невидимой пулей (урон — параметр sniper.damage, по умолчанию 8.0).
+ *       Если ВАША пуля уже летит и рядом с ней враг/не-союзник — тот же ЛКМ доворачивает пулю
+ *       на врага (один раз на пулю).</li>
  *   <li>Ульта — палка «Ultra Bullet»: ПКМ запускает каст ~2с, затем авто-выстрел пулей,
  *       которая ваншотает; ПКМ во время каста отменяет (без кулдауна). После выстрела —
- *       кулдаун {@value #ULT_COOLDOWN_SEC}с, по истечении кнопка возвращается.</li>
+ *       кулдаун (по умолчанию 105с, читается из ClassRegistry), по истечении кнопка возвращается.</li>
  * </ul>
  *
  * <h2>Что починено относительно старой версии</h2>
@@ -93,18 +95,18 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
     private static final String KIND_DESTROY = "destroy"; // арбалет ульты
     private static final String KIND_ULT     = "ult";     // палка-кнопка ульты
 
-    /* ===================== Баланс ===================== */
-    private static final double DAMAGE_NORMAL        = 8.0;
-    private static final double DAMAGE_ULTA          = 1000.0; // фактически ваншот (через damage-события)
-    private static final double NORMAL_SPEED         = 0.6;    // блоков/тик — «медленная пуля»
-    private static final double ULT_SPEED            = 0.7;
-    private static final double BULLET_RADIUS        = 0.35;   // допуск попадания по хитбоксу
-    private static final double DISTANCE_DETECT      = 10.0;   // радиус доворота на врага
-    private static final long   REMOVE_BULLET_AFTER  = 120L;   // тиков жизни пули
-    private static final long   REFIRE_MS            = 1500L;  // задержка между выстрелами
-    private static final long   ULT_CAST_TICKS       = 40L;    // ~2с каста ульты
-    private static final int    ULT_COOLDOWN_SEC     = 105;
+    /* ===================== Баланс (читается из ClassRegistry при использовании) ===================== */
+    private static final long   REFIRE_MS            = 2000L;  // задержка между выстрелами (внутренняя): 2.0с
+    private static final long   ULT_CAST_TICKS       = 40L;    // ~2с каста ульты (внутренняя)
     private static final String ULT_COOLDOWN_ID      = "lady_ult";
+
+    private static double damageNormal()      { return ClassRegistry.num("ladynagan", "sniper", "damage", 8.0); }
+    private static double damageUlt()         { return ClassRegistry.num("ladynagan", "ult", "damage", 1000.0); } // фактически ваншот
+    private static double normalSpeed()       { return ClassRegistry.num("ladynagan", "sniper", "bulletSpeed", 0.6); } // блоков/тик — «медленная пуля»
+    private static double ultSpeed()          { return ClassRegistry.num("ladynagan", "ult", "bulletSpeed", 0.7); }
+    private static double bulletRadius()      { return ClassRegistry.num("ladynagan", "sniper", "bulletRadius", 0.35); } // допуск попадания по хитбоксу
+    private static double redirectRadius()    { return ClassRegistry.num("ladynagan", "sniper", "redirectRadius", 10.0); } // радиус доворота на врага
+    private static int bulletLifetimeTicks()  { return ClassRegistry.numInt("ladynagan", "sniper", "bulletLifetimeTicks", 120); } // тиков жизни пули
 
     private final Plugin plugin;
     private final LadyCooldownManager cooldownManager;
@@ -158,6 +160,11 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
         meta.setUnbreakable(true);
         meta.setLore(List.of("something"));
         meta.getPersistentDataContainer().set(keyKind, PersistentDataType.STRING, kind);
+        if (KIND_STICK.equals(kind)) {
+            ItemModels.apply(meta, "ledynagan_gun_one_gun");
+        } else if (KIND_ULT.equals(kind)) {
+            ItemModels.apply(meta, "ledynagan_ulta");
+        }
         item.setItemMeta(meta);
         return item;
     }
@@ -169,6 +176,13 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
         meta.setUnbreakable(true);
         meta.getPersistentDataContainer().set(keyKind, PersistentDataType.STRING, kind);
         meta.addChargedProjectile(new ItemStack(Material.ARROW)); // держим «заряженной» ради модели
+        if (KIND_RAISED.equals(kind)) {
+            ItemModels.apply(meta, "ledynagan_gun_second_gun");
+        } else if (KIND_FIRED.equals(kind)) {
+            ItemModels.apply(meta, "ledynagan_gun_third_gun");
+        } else if (KIND_DESTROY.equals(kind)) {
+            ItemModels.apply(meta, "ledynagan_gun_fourth_gun");
+        }
         cb.setItemMeta(meta);
         return cb;
     }
@@ -202,6 +216,13 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
         boolean left  = event.getAction() == Action.LEFT_CLICK_AIR  || event.getAction() == Action.LEFT_CLICK_BLOCK;
         SniperState st = state(player);
 
+        // Само-починка рассинхрона «предмет ↔ состояние». Раньше «поднятый» арбалет мог залипнуть
+        // намертво (несколько игроков за класс, смерть с keepInventory, перевыдача кита, гонка тасков):
+        // фаза HOLSTERED, а в руке арбалет-болванка — его нельзя ни опустить, ни выстрелить, ни выкинуть
+        // (дроп арбалета отменяется), оставалось только заменить новым. Теперь клик по осиротевшему
+        // предмету возвращает его в рабочий вид, а зависшая фаза сбрасывается.
+        if (reconcileDesync(player, st, kind)) { event.setCancelled(true); return; }
+
         switch (kind) {
             case KIND_STICK -> {
                 if (right) { event.setCancelled(true); raiseRifle(player); }
@@ -211,12 +232,14 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
             }
             case KIND_RAISED, KIND_FIRED -> {
                 event.setCancelled(true); // арбалет — болванка, гасим ваниль всегда
-                if (right) {
+                if (left) {
+                    // ЛКМ: если ВАША пуля уже летит и рядом с ней враг — доворачиваем её на
+                    // врага (раз на пулю); иначе — обычный выстрел новой пулей.
                     Bullet redirectable = findRedirectableBullet(player);
                     if (redirectable != null) redirect(redirectable, player);
-                    else lowerRifle(player);
-                } else if (left) {
-                    tryFire(player, st);
+                    else tryFire(player, st);
+                } else if (right) {
+                    lowerRifle(player); // ПКМ теперь только опускает прицел
                 }
             }
             case KIND_DESTROY -> {
@@ -224,6 +247,41 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
                 if (right && st.phase == Phase.ULT_CASTING) cancelUlt(player, true);
             }
         }
+    }
+
+    /**
+     * Приводит предмет и состояние к согласованному виду перед обычной обработкой клика.
+     *
+     * <ul>
+     *   <li><b>Осиротевший арбалет</b> — в руке арбалет-болванка (RAISED/FIRED/DESTROY), но фаза
+     *       с ним не совпадает (напр., прицел «поднят», а state уже HOLSTERED). Возвращаем рабочий
+     *       предмет (палку снайперки / кнопку ульты), полностью снимаем тыкву-прицел, замедление и
+     *       таски. Возвращаем {@code true} — клик обработан, дальше не идём.</li>
+     *   <li><b>Зависшая фаза</b> — фаза висит в AIMING/ULT_CASTING, но в слоте прицела уже нет нашего
+     *       арбалета (палку/кнопку перевыдал внешний плагин или её подобрали). Молча чистим state в
+     *       HOLSTERED и {@code false} — пусть обычный обработчик поднимет прицел / запустит ульту.</li>
+     * </ul>
+     */
+    private boolean reconcileDesync(Player player, SniperState st, String kind) {
+        boolean orphanRifle = (KIND_RAISED.equals(kind) || KIND_FIRED.equals(kind)) && st.phase != Phase.AIMING;
+        boolean orphanUlt   = KIND_DESTROY.equals(kind) && st.phase != Phase.ULT_CASTING;
+        if (orphanRifle || orphanUlt) {
+            if (st.castTask != null) { st.castTask.cancel(); st.castTask = null; }
+            cleanupScope(player, st, true); // вернуть настоящий шлем, снять slow/таски, фаза → HOLSTERED
+            int slot = player.getInventory().getHeldItemSlot();
+            player.getInventory().setItem(slot, orphanUlt ? makeUltraButton() : makeSniperStick());
+            player.sendActionBar(Component.text("§7Rifle reset"));
+            return true;
+        }
+
+        if ((KIND_STICK.equals(kind) || KIND_ULT.equals(kind)) && st.phase != Phase.HOLSTERED) {
+            ItemStack aimItem = st.aimSlot >= 0 ? player.getInventory().getItem(st.aimSlot) : null;
+            if (!isOurCrossbow(aimItem)) { // арбалета в слоте прицела нет — состояние осиротело
+                if (st.castTask != null) { st.castTask.cancel(); st.castTask = null; }
+                cleanupScope(player, st, true);
+            }
+        }
+        return false;
     }
 
     /* ===================== Подъём/опускание прицела ===================== */
@@ -275,7 +333,8 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
                 if (player.isOnline()) fireBullet(player, true);
                 cleanupScope(player, s, true);
                 if (slot >= 0) player.getInventory().setItem(slot, null); // расход; вернётся по кулдауну
-                cooldownManager.startCooldownAndReturn(player, ULT_COOLDOWN_ID, ULT_COOLDOWN_SEC,
+                cooldownManager.startCooldownAndReturn(player, ULT_COOLDOWN_ID,
+                        ClassRegistry.seconds("ladynagan", "ult", 105),
                         makeUltraButton(), false, Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.7f, 1.25f);
             }
         }.runTaskLater(plugin, ULT_CAST_TICKS);
@@ -332,7 +391,13 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
     }
 
     private ArmorStand spawnBulletStand(Location spawn, Vector dir) {
-        ArmorStand as = spawn.getWorld().spawn(spawn, ArmorStand.class, a -> {
+        // Ориентируем стенд ДО спавна: если задать yaw уже после spawn() отдельным teleport,
+        // клиент интерполирует поворот от «спавн-yaw» к новому — и пуля визуально
+        // «доворачивается» в первые тики полёта. Рождаем стенд сразу с нужным yaw.
+        Location at = spawn.clone();
+        at.setYaw(yawFromDir(dir));
+        at.setPitch(0f);
+        return at.getWorld().spawn(at, ArmorStand.class, a -> {
             a.setVisible(false);
             a.setGravity(false);
             a.setSmall(true);
@@ -343,22 +408,27 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
             ItemStack bulletDye = new ItemStack(Material.RED_DYE);
             ItemMeta m = bulletDye.getItemMeta();
             m.displayName(Component.text("Bullet"));
+            ItemModels.apply(m, "ledynagan_bullet_gun");
             bulletDye.setItemMeta(m);
             a.getEquipment().setItemInMainHand(bulletDye); // визуал пули через ресурспак
             a.addScoreboardTag("bullet");
         });
-        updateArmorStandRotation(as, dir);
-        return as;
     }
 
+    /**
+     * Yaw (в градусах) по горизонтальной составляющей направления.
+     * Совпадает с yaw игрока в момент выстрела — стенд смотрит строго вдоль полёта.
+     * (Старая формула добавляла +90° и меняла знак → пуля отворачивалась в полёте.)
+     */
+    private static float yawFromDir(Vector direction) {
+        return (float) Math.toDegrees(Math.atan2(-direction.getX(), direction.getZ()));
+    }
+
+    /** Перенаводит визуал стенда под текущее направление (используется при довороте). */
     private void updateArmorStandRotation(ArmorStand armorStand, Vector direction) {
-        double x = direction.getX();
-        double z = direction.getZ();
-        double theta = Math.atan2(-x, z);
-        theta += Math.PI / 2;
-        theta *= -180 / Math.PI;
         Location loc = armorStand.getLocation();
-        loc.setYaw((float) theta);
+        loc.setYaw(yawFromDir(direction));
+        loc.setPitch(0f);
         armorStand.teleport(loc);
     }
 
@@ -392,8 +462,9 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
         for (Player p : location.getWorld().getPlayers()) {
             if (p.equals(owner) || isAlly(p, owner)) continue;
             if (p.getGameMode() == GameMode.SPECTATOR || p.getGameMode() == GameMode.CREATIVE) continue;
+            double detect = redirectRadius();
             double d = p.getLocation().distanceSquared(location);
-            if (d <= DISTANCE_DETECT * DISTANCE_DETECT && d < bestDist) { best = p; bestDist = d; }
+            if (d <= detect * detect && d < bestDist) { best = p; bestDist = d; }
         }
         return best;
     }
@@ -419,7 +490,9 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
             @Override public void run() {
                 SniperState s = states.get(player.getUniqueId());
                 if (s == null || s.phase == Phase.HOLSTERED || !player.isOnline()) { cancel(); return; }
-                int amp = player.isSneaking() ? 5 : 3;
+                int amp = player.isSneaking()
+                        ? ClassRegistry.numInt("ladynagan", "sniper", "aimSlownessSneakAmp", 5)
+                        : ClassRegistry.numInt("ladynagan", "sniper", "aimSlownessAmp", 3);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, amp, false, false, false));
             }
         }.runTaskTimer(plugin, 0L, 10L);
@@ -616,14 +689,14 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
 
         private void tick() {
             if (stand == null || stand.isDead()) { destroy(); return; }
-            if (++age > REMOVE_BULLET_AFTER) { destroy(); return; }
+            if (++age > bulletLifetimeTicks()) { destroy(); return; }
 
             Player shooter = Bukkit.getPlayer(owner);
             if (shooter == null) { destroy(); return; } // владелец оффлайн — пуля гасится
 
             World w = stand.getWorld();
             Location cur = stand.getLocation();
-            double step = ult ? ULT_SPEED : NORMAL_SPEED;
+            double step = ult ? ultSpeed() : normalSpeed();
 
             // блок на пути (свип лучом за один шаг — против туннелинга)
             RayTraceResult hit = w.rayTraceBlocks(cur, dir, step + 0.1, FluidCollisionMode.NEVER, true);
@@ -640,9 +713,9 @@ public class LadyNaganSniperListener implements Listener, KitResettable {
                 if (isAlly(target, shooter)) continue;                 // союзники/спектаторы прозрачны
                 if (target.getGameMode() == GameMode.CREATIVE) continue;
                 if (target.isInvulnerable()) continue;
-                if (target.getBoundingBox().clone().expand(BULLET_RADIUS)
+                if (target.getBoundingBox().clone().expand(bulletRadius())
                         .contains(next.getX(), next.getY(), next.getZ())) {
-                    double dmg = ult ? DAMAGE_ULTA : DAMAGE_NORMAL;
+                    double dmg = ult ? damageUlt() : damageNormal();
                     target.damage(dmg, shooter);
                     target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.0f);
                     destroy();

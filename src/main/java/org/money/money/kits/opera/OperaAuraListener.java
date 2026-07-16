@@ -41,7 +41,7 @@ public final class OperaAuraListener implements Listener {
         MARCH
     }
 
-    private static final double AURA_RADIUS = 10.0;
+    private static double AURA_RADIUS() { return org.money.money.meta.ClassRegistry.num("opera", "aura", "radius", 10.0); }
     private static final int AURA_TICK_PERIOD = 10; // 0.5s
     private static final int EFFECT_DURATION = 30; // 1.5s
 
@@ -179,7 +179,7 @@ public final class OperaAuraListener implements Listener {
                 if (ally == null || !ally.isOnline() || ally.isDead()) continue;
                 if (ally.getUniqueId().equals(center.getUniqueId())) continue;
                 if (!ally.getWorld().equals(center.getWorld())) continue;
-                if (ally.getLocation().distanceSquared(center.getLocation()) > AURA_RADIUS * AURA_RADIUS) continue;
+                if (ally.getLocation().distanceSquared(center.getLocation()) > AURA_RADIUS() * AURA_RADIUS()) continue;
                 applyModeEffect(ally, mode);
             }
             return;
@@ -189,16 +189,16 @@ public final class OperaAuraListener implements Listener {
             Player ally = Bukkit.getPlayerExact(entry);
             if (ally == null || !ally.isOnline() || ally.isDead()) continue;
             if (!ally.getWorld().equals(center.getWorld())) continue;
-            if (ally.getLocation().distanceSquared(center.getLocation()) > AURA_RADIUS * AURA_RADIUS) continue;
+            if (ally.getLocation().distanceSquared(center.getLocation()) > AURA_RADIUS() * AURA_RADIUS()) continue;
             applyModeEffect(ally, mode);
         }
     }
 
     private void applyModeEffect(Player ally, AuraMode mode) {
         switch (mode) {
-            case ATTACK -> ally.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, EFFECT_DURATION, 0, false, false, true));
-            case FORMATION -> ally.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, EFFECT_DURATION, 0, false, false, true));
-            case MARCH -> ally.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, EFFECT_DURATION, 0, false, false, true));
+            case ATTACK -> ally.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, EFFECT_DURATION, org.money.money.meta.ClassRegistry.numInt("opera", "aura", "attackAmplifier", 0), false, false, true));
+            case FORMATION -> ally.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, EFFECT_DURATION, org.money.money.meta.ClassRegistry.numInt("opera", "aura", "formationAmplifier", 0), false, false, true));
+            case MARCH -> ally.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, EFFECT_DURATION, org.money.money.meta.ClassRegistry.numInt("opera", "aura", "marchSpeedAmplifier", 0), false, false, true));
             default -> { }
         }
     }
@@ -209,8 +209,8 @@ public final class OperaAuraListener implements Listener {
 
         for (int i = 0; i < 12; i++) {
             double angle = (Math.PI * 2 * i) / 12;
-            double x = Math.cos(angle) * AURA_RADIUS;
-            double z = Math.sin(angle) * AURA_RADIUS;
+            double x = Math.cos(angle) * AURA_RADIUS();
+            double z = Math.sin(angle) * AURA_RADIUS();
             Location p = center.clone().add(x, 0.2, z);
             center.getWorld().spawnParticle(Particle.DUST, p, 1, 0, 0, 0, 0, purple);
             if (i % 3 == 0) {

@@ -10,6 +10,7 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import org.money.money.util.ItemModels;
 import org.money.money.kits.airwalker.WindInvisListener;
 import org.money.money.kits.airwalker.WindListener;
 import org.money.money.kits.airwalker.WindSwordListener;
@@ -22,6 +23,7 @@ import org.money.money.kits.dio.VampireListener;
 import org.money.money.kits.fukuko.FukukoPistolListener;
 import org.money.money.kits.fukuko.FukukoMortiraListener;
 import org.money.money.kits.fukuko.FukukoBombZoneListener;
+import org.money.money.kits.fukuko.FukukoShockGrenadeListener;
 import org.money.money.kits.ladynagan.LadyNaganSniperListener;
 import org.money.money.kits.ladynagan.LadyNaganFlyListener;
 import org.money.money.kits.ladynagan.LadyNaganTrapsListener;
@@ -38,6 +40,7 @@ import org.money.money.kits.ishigava.IshigavaAuraListener;
 import org.money.money.kits.ishigava.IshigavaKunaiBowListener;
 import org.money.money.kits.ganyu.listeners.GanyuBudListener;
 import org.money.money.kits.ganyu.listeners.GanyuUltListener;
+import org.money.money.kits.ganyu.listeners.GanyuMeteorListener;
 import org.money.money.kits.haohao.MaskAbility;
 import org.money.money.kits.haohao.SwordShield;
 import org.money.money.kits.opera.OperaAuraListener;
@@ -67,6 +70,7 @@ import org.money.money.kits.blastborn.ImpactGrenadeListener;
 import org.money.money.kits.blastborn.PhoenixDetonatorListener;
 import org.money.money.kits.blastborn.SweatMachineGunListener;
 import org.money.money.kits.ishigava.IshigavaCloneListener;
+import org.money.money.kits.bluerose.BlueRoseGuardianManager;
 import org.bukkit.enchantments.Enchantment;
 
 import java.util.*;
@@ -77,6 +81,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
 
     private final GanyuBudListener budListener;
     private final GanyuUltListener ganyuUltListener;
+    private final GanyuMeteorListener ganyuMeteorListener;
     private final HuTaoInvisListener huTaoInvisListener;
     private final HuTaoPyroListener huTaoPyroListener;
     private final HuTaoBoomListener huTaoBoomListener;
@@ -107,6 +112,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     private final FukukoPistolListener fukukoPistolListener;
     private final FukukoMortiraListener fukukoMortiraListener;
     private final FukukoBombZoneListener fukukoBombZoneListener;
+    private final FukukoShockGrenadeListener fukukoShockGrenadeListener;
     private final LadyNaganSniperListener ladySniperListener;
     private final LadyNaganFlyListener ladyFlyListener;
     private final LadyNaganTrapsListener ladyTrapsListener;
@@ -131,6 +137,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     private final PhoenixDetonatorListener blastPhoenixListener;
     private final SweatMachineGunListener blastGunListener;
     private final IshigavaCloneListener ishiClonesListener;
+    private final BlueRoseGuardianManager blueRoseManager;
 
 
     private final NamespacedKey KEY_GANYU_BOW;
@@ -139,6 +146,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     public KitGiveCommand(Plugin plugin,
                           GanyuBudListener budListener,
                           GanyuUltListener ganyuUltListener,
+                          GanyuMeteorListener ganyuMeteorListener,
                           HuTaoInvisListener huTaoInvisListener,
                           HuTaoPyroListener huTaoPyroListener,
                           HuTaoBoomListener huTaoBoomListener,
@@ -169,6 +177,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                           FukukoPistolListener fukukoPistolListener,
                           FukukoMortiraListener fukukoMortiraListener,
                           FukukoBombZoneListener fukukoBombZoneListener,
+                          FukukoShockGrenadeListener fukukoShockGrenadeListener,
                           LadyNaganSniperListener ladySniperListener,
                           LadyNaganFlyListener ladyFlyListener,
                           LadyNaganTrapsListener ladyTrapsListener,
@@ -192,11 +201,13 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                           ImpactGrenadeListener blastGrenadeListener,
                           PhoenixDetonatorListener blastPhoenixListener,
                           SweatMachineGunListener blastGunListener,
-                          IshigavaCloneListener ishiClonesListener) {
+                          IshigavaCloneListener ishiClonesListener,
+                          BlueRoseGuardianManager blueRoseManager) {
 
         this.plugin = Objects.requireNonNull(plugin);
         this.budListener = Objects.requireNonNull(budListener);
         this.ganyuUltListener = Objects.requireNonNull(ganyuUltListener);
+        this.ganyuMeteorListener = Objects.requireNonNull(ganyuMeteorListener);
         this.huTaoInvisListener = Objects.requireNonNull(huTaoInvisListener);
         this.huTaoPyroListener = Objects.requireNonNull(huTaoPyroListener);
         this.huTaoBoomListener = Objects.requireNonNull(huTaoBoomListener);
@@ -227,6 +238,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.fukukoPistolListener   = Objects.requireNonNull(fukukoPistolListener);
         this.fukukoMortiraListener  = Objects.requireNonNull(fukukoMortiraListener);
         this.fukukoBombZoneListener = Objects.requireNonNull(fukukoBombZoneListener);
+        this.fukukoShockGrenadeListener = Objects.requireNonNull(fukukoShockGrenadeListener);
         this.ladySniperListener     = Objects.requireNonNull(ladySniperListener);
         this.ladyFlyListener        = Objects.requireNonNull(ladyFlyListener);
         this.ladyTrapsListener      = Objects.requireNonNull(ladyTrapsListener);
@@ -251,6 +263,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.blastPhoenixListener  = Objects.requireNonNull(blastPhoenixListener);
         this.blastGunListener      = Objects.requireNonNull(blastGunListener);
         this.ishiClonesListener    = Objects.requireNonNull(ishiClonesListener);
+        this.blueRoseManager       = Objects.requireNonNull(blueRoseManager);
 
         this.KEY_GANYU_BOW = new NamespacedKey(plugin, "ganyu_bow");
         this.KEY_DIO_HAND  = new NamespacedKey(plugin, "dio_hand");
@@ -280,12 +293,13 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GRAY + " /" + label + " SaberLight <Excalibur|Ult|Trade> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " SaberD <excaliburd|ultd> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " SaberLight souladd [amount] [player]");
-            sender.sendMessage(ChatColor.GRAY + " /" + label + " Fukuko <pistol|mortira|bombzone> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " Fukuko <pistol|mortira|bombzone|shock> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " LadyNagan <sniper|ult|fly|trap|explosion> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Saske <katana|shuriken|body|chidori|attraction> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Ishigava <shield|bridge|wall|aura|kunai|clones> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " TimeWalker <run|slash|momentum|ult> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Blastborn <gloves|grenade|ult|machinegun> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " BlueRose <oath|ward|rosebind|petal|heritage|garden|storm> [player]");
             return true;
         }
 
@@ -347,6 +361,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                     case "bow" -> { itemToGive = makeGanyuBow();                pretty = "Frostsong Bow"; }
                     case "bud" -> { itemToGive = budListener.makeFrostbudDye(); pretty = "Frostbud"; }
                     case "ult", "core", "ultimate" -> { itemToGive = ganyuUltListener.makeUltItem(); pretty = "Everfrost Core"; }
+                    case "meteor", "meteorite", "frostfall" -> { itemToGive = ganyuMeteorListener.makeMeteorItem(); pretty = "Frostfall"; }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Ganyu: " + sub); return true; }
                 }
             }
@@ -538,6 +553,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                     case "pistol", "gun" -> { itemToGive = fukukoPistolListener.makePistol();          pretty = "pistol"; }
                     case "mortira", "mortar" -> { itemToGive = fukukoMortiraListener.makeMortiraBlock(); pretty = "Mortira"; }
                     case "bombzone", "bomb", "ult", "zone" -> { itemToGive = fukukoBombZoneListener.makeBombZoneBlock(); pretty = "BombZone"; }
+                    case "shock", "shockgrenade", "grenade", "field" -> { itemToGive = fukukoShockGrenadeListener.makeShockGrenade(); pretty = "Shock Grenade"; }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Fukuko: " + sub); return true; }
                 }
             }
@@ -591,6 +607,19 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                 }
                 blastbornManager.markBlastborn(target);
             }
+            case "bluerose", "blueroseguardian", "guardian", "rose", "brg" -> {
+                switch (sub) {
+                    case "oath", "sword", "roseoath" -> { itemToGive = blueRoseManager.makeRoseOath();      pretty = "Rose Oath"; }
+                    case "ward", "rose", "wards" -> { itemToGive = blueRoseManager.makeWard();              pretty = "Blue Rose Ward"; }
+                    case "rosebind", "bind", "root" -> { itemToGive = blueRoseManager.makeRosebind();       pretty = "Rosebind"; }
+                    case "petal", "petalstep", "dash", "step" -> { itemToGive = blueRoseManager.makePetalStep(); pretty = "Petal Step"; }
+                    case "heritage", "bloom", "heritagebloom" -> { itemToGive = blueRoseManager.makeHeritageBloom(); pretty = "Heritage Bloom"; }
+                    case "garden", "ult", "firstrose" -> { itemToGive = blueRoseManager.makeGarden();       pretty = "Garden of the First Rose"; }
+                    case "storm", "soumetsu", "frost" -> { itemToGive = blueRoseManager.makeStorm();        pretty = "Kamisato Art: Soumetsu"; }
+                    default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для BlueRose: " + sub); return true; }
+                }
+                blueRoseManager.markGuardian(target);
+            }
 
 
 
@@ -639,6 +668,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE);
         im.setUnbreakable(true);
         im.getPersistentDataContainer().set(KEY_DIO_HAND, PersistentDataType.BYTE, (byte)1);
+        ItemModels.apply(im, "dio_diohand");
         it.setItemMeta(im);
         return it;
     }
@@ -652,9 +682,9 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (!sender.hasPermission("kits.give")) return List.of();
 
-        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker","HaoHao","LightSaber","DarkSaber","Fukuko","LadyNagan","Saske","Ishigava","TimeWalker","Blastborn"), args[0]);
+        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker","HaoHao","LightSaber","DarkSaber","Fukuko","LadyNagan","Saske","Ishigava","TimeWalker","Blastborn","BlueRose"), args[0]);
         if (args.length == 2) {
-            if ("ganyu".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("bow","bud","ult"), args[1]);
+            if ("ganyu".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("bow","bud","ult","meteor"), args[1]);
             if ("hutao".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("homa","pyro","ult"), args[1]);
             if ("dio".equalsIgnoreCase(args[0]))     return filter(Arrays.asList("hand","timestop","vampire"), args[1]);
             if ("uraraka".equalsIgnoreCase(args[0])) return filter(Arrays.asList("glove","gravity","healpost","levmark"), args[1]);
@@ -669,7 +699,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             if ("saberd".equalsIgnoreCase(args[0]) || "saberdark".equalsIgnoreCase(args[0]) || "darksaber".equalsIgnoreCase(args[0]))
                 return filter(Arrays.asList("excaliburd","ultd","soultrades","souladd"), args[1]);
             if ("fukuko".equalsIgnoreCase(args[0]) || "fuku".equalsIgnoreCase(args[0]))
-                return filter(Arrays.asList("pistol","mortira","bombzone"), args[1]);
+                return filter(Arrays.asList("pistol","mortira","bombzone","shock"), args[1]);
             if ("ladynagan".equalsIgnoreCase(args[0]) || "lady".equalsIgnoreCase(args[0]) || "nagan".equalsIgnoreCase(args[0]))
                 return filter(Arrays.asList("sniper","ult","fly","trap","explosion"), args[1]);
             if ("saske".equalsIgnoreCase(args[0]) || "sasuke".equalsIgnoreCase(args[0]))
@@ -680,6 +710,9 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                 return filter(Arrays.asList("run","slash","momentum","ult"), args[1]);
             if ("blastborn".equalsIgnoreCase(args[0]) || "blast".equalsIgnoreCase(args[0]))
                 return filter(Arrays.asList("gloves","grenade","ult","machinegun"), args[1]);
+            if ("bluerose".equalsIgnoreCase(args[0]) || "blueroseguardian".equalsIgnoreCase(args[0])
+                    || "guardian".equalsIgnoreCase(args[0]) || "rose".equalsIgnoreCase(args[0]) || "brg".equalsIgnoreCase(args[0]))
+                return filter(Arrays.asList("oath","ward","rosebind","petal","heritage","garden","storm"), args[1]);
         }
         if (args.length == 3) {
             if (("saberlight".equalsIgnoreCase(args[0]) || "saber".equalsIgnoreCase(args[0]) || "light".equalsIgnoreCase(args[0]))

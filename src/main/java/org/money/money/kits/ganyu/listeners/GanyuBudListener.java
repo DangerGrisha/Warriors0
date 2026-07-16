@@ -24,6 +24,7 @@ import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
 import org.money.money.combat.ElementalReactions;
 import org.money.money.session.KitSession;
+import org.money.money.util.ItemModels;
 
 import java.util.*;
 
@@ -39,9 +40,6 @@ public final class GanyuBudListener implements Listener {
 
 
     // тайминги / радиусы
-    private static final int    BUD_LIFETIME_TICKS = 20 * 20;  // 20 сек
-    private static final int    BUD_PULSE_PERIOD   = 20 * 3;   // каждые 3 сек
-    private static final double RING_RADIUS        = 10.0;     // радиус колец (XZ)
     private static final double RING_THICKNESS   = 1.25;  // было 0.8
     private static final double RING_HALF_HEIGHT = 1.25;  // было 0.75
     private static final double RING_RADIUS_FUZZ = 0.30;  // новый: небольшой люфт по радиусу
@@ -49,12 +47,14 @@ public final class GanyuBudListener implements Listener {
     private static final double RING_Y_TOP_OFFSET  = +1.0;     // +1y от бутона
     private static final double RING_Y_BOT_OFFSET  = -1.0;     // -1y от бутона
 
-    private static final int    FREEZE_ADD   = 80;             // +4с к фризу
-    private static final int    SLOW_TICKS   = 60;             // 3с слоунесс
-    private static final int    SLOW_LEVEL   = 1;              // Slowness II
-    private static final double BUD_DAMAGE   = 4.0;            // 1❤ урона
-
-    private static final int    COOLDOWN_TICKS = 20 * 80;      // 80 сек
+    // баланс — читается из ClassRegistry при использовании (def = прежние значения)
+    private static int    budLifetimeTicks() { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bud", "durationTicks", 400); }
+    private static int    budPulsePeriod()   { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bud", "pulsePeriodTicks", 60); }
+    private static double ringRadius()       { return org.money.money.meta.ClassRegistry.num("ganyu", "bud", "radius", 10.0); }
+    private static int    freezeAddTicks()   { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bud", "freezeAddTicks", 80); }
+    private static int    slowTicks()        { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bud", "slowDurationTicks", 60); }
+    private static int    slowAmplifier()    { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bud", "slowAmplifier", 1); }
+    private static double budDamage()        { return org.money.money.meta.ClassRegistry.num("ganyu", "bud", "damage", 4.0); }
 
     private final Map<UUID, BukkitTask> spinTask  = new HashMap<>();
     private final Map<UUID, BukkitTask> pulseTask = new HashMap<>();
@@ -93,11 +93,13 @@ public final class GanyuBudListener implements Listener {
         startSpin(as);
         startPulses(as, p);
 
+        applyPlaceRecoil(p); // установка бутона чуть-чуть отбрасывает Ганью назад
+
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             cleanupStand(as);
             removeViewChangerIfPresent(p);
             startCooldownReturnDye(p);
-        }, BUD_LIFETIME_TICKS);
+        }, budLifetimeTicks());
     }
 
     /* ================== USE: View Changer (ENDER_EYE) ================== */
@@ -208,6 +210,7 @@ public final class GanyuBudListener implements Listener {
     }
 
     private void startCooldownReturnDye(Player p) {
+        int cooldownTicks = org.money.money.meta.ClassRegistry.ticks("ganyu", "bud", 1600);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!p.isOnline() || !KitSession.isInGame(p)) return;
             p.getInventory().addItem(makeFrostbudDye());
@@ -217,7 +220,7 @@ public final class GanyuBudListener implements Listener {
             );
 
             p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.6f);
-        }, COOLDOWN_TICKS);
+        }, cooldownTicks);
     }
 
     /* ---------- ArmorStand ---------- */
@@ -240,7 +243,7 @@ public final class GanyuBudListener implements Listener {
             s.setCustomNameVisible(false);
             //s.setCustomName("§bFrostbud");
             ItemStack flower = new ItemStack(Material.CORNFLOWER);
-            ItemMeta fm = flower.getItemMeta(); fm.displayName(Component.text(("FrostBud"))); flower.setItemMeta(fm);
+            ItemMeta fm = flower.getItemMeta(); fm.displayName(Component.text(("FrostBud"))); ItemModels.apply(fm, "ganyu_meow_bud"); flower.setItemMeta(fm);
             s.getEquipment().setItemInMainHand(flower);
             var pdc = s.getPersistentDataContainer();
             pdc.set(KEY_BUD_STAND, PersistentDataType.BYTE, (byte)1);
@@ -269,7 +272,7 @@ public final class GanyuBudListener implements Listener {
             ringsExplosion(center);
             applyCryoRings(center, owner);
             center.getWorld().playSound(center, Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.7f, 1.9f);
-        }, 0L, BUD_PULSE_PERIOD);
+        }, 0L, budPulsePeriod());
         pulseTask.put(id, pulse);
     }
     private void stopPulse(UUID id) { Optional.ofNullable(pulseTask.remove(id)).ifPresent(BukkitTask::cancel); }
@@ -280,11 +283,24 @@ public final class GanyuBudListener implements Listener {
         if (as.isValid()) as.remove();
     }
 
+    /** Отдача: установка бутона отбрасывает Ганью чуть-чуть назад. */
+    private void applyPlaceRecoil(Player p) {
+        double recoil = org.money.money.meta.ClassRegistry.num("ganyu", "bud", "placeRecoil", 0.5);
+        if (recoil <= 0) return;
+        Vector dir = p.getLocation().getDirection();
+        dir.setY(0);
+        if (dir.lengthSquared() < 1.0e-6) dir = new Vector(0, 0, 1); // смотрит вертикально — толкаем условно
+        Vector back = dir.normalize().multiply(-recoil);
+        back.setY(0.2); // маленький «подскок»
+        p.setVelocity(back);
+        p.playSound(p.getLocation(), Sound.ITEM_TRIDENT_RIPTIDE_1, 0.5f, 1.3f);
+    }
+
     /* ---------- SNAP LOOK ---------- */
 
     private void snapEnemiesLookToBud(Location bud, Player owner) {
         World w = bud.getWorld();
-        double r = RING_RADIUS; // тот же радиус, что и у умения
+        double r = ringRadius(); // тот же радиус, что и у умения
 
         for (var e : w.getNearbyEntities(bud, r, r, r)) {
             if (!(e instanceof LivingEntity le) || le.isDead() || !le.isValid()) continue;
@@ -304,8 +320,9 @@ public final class GanyuBudListener implements Listener {
     private void ringsExplosion(Location center) {
         World w = center.getWorld();
         var ice = new Particle.DustOptions(org.bukkit.Color.fromRGB(120,180,255), 1.1f);
-        renderRing(w, center, RING_Y_TOP_OFFSET, RING_RADIUS, ice);
-        renderRing(w, center, RING_Y_BOT_OFFSET, RING_RADIUS, ice);
+        double radius = ringRadius();
+        renderRing(w, center, RING_Y_TOP_OFFSET, radius, ice);
+        renderRing(w, center, RING_Y_BOT_OFFSET, radius, ice);
         w.spawnParticle(Particle.SNOWFLAKE, center.clone().add(0, RING_Y_TOP_OFFSET, 0),
                 30, 0.6, 0.2, 0.6, 0.01);
         w.spawnParticle(Particle.SNOWFLAKE, center.clone().add(0, RING_Y_BOT_OFFSET, 0),
@@ -330,7 +347,8 @@ public final class GanyuBudListener implements Listener {
         // раньше было: double range = RING_RADIUS + RING_THICKNESS + 1.0;
         // var nearby = w.getNearbyEntities(center, range, 2.5, range);
 
-        double sx = RING_RADIUS + 2.0;          // захват по XZ чуть больше радиуса
+        int freezeAdd = freezeAddTicks();
+        double sx = ringRadius() + 2.0;         // захват по XZ чуть больше радиуса
         double sy = RING_HALF_HEIGHT + 2.0;     // захват по высоте с запасом
         var nearby = w.getNearbyEntities(center, sx, sy, sx);
 
@@ -342,24 +360,11 @@ public final class GanyuBudListener implements Listener {
             if (!isInsideDiscLayer(center, le, RING_Y_TOP_OFFSET) &&
                     !isInsideDiscLayer(center, le, RING_Y_BOT_OFFSET)) continue;
 
-            // эффекты/урон как у тебя
-            // слоунесс/фриз — как раньше (это визуал/контроль, не «аура»)
-            le.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, SLOW_TICKS, SLOW_LEVEL, false, true, true));
-            le.setFreezeTicks(Math.min(le.getMaxFreezeTicks(), le.getFreezeTicks() + FREEZE_ADD));
-
-            // расчёт урона с реакцией Cryo против возможной текущей ауры
-            double finalDmg = elemental.applyOnTotalDamage(
-                    le,
-                    BUD_DAMAGE,
-                    ElementalReactions.Element.CRYO,
-                    /*newAuraTicks=*/FREEZE_ADD,
-                    /*consumeOnReact=*/true
-            );
-
-            // нанести урон с владельцем
-            if (owner != null && owner.isOnline()) le.damage(finalDmg, owner);
-            else le.damage(finalDmg);
-
+            // Бутон теперь ТОЛЬКО замедляет — урона не наносит вообще.
+            le.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slowTicks(), slowAmplifier(), false, true, true));
+            // Иней (визуал) держим НИЖЕ порога урона от заморозки (max-20), чтобы бутон точно не бил уроном.
+            int frost = Math.min(le.getMaxFreezeTicks() - 20, le.getFreezeTicks() + freezeAdd);
+            if (frost > le.getFreezeTicks()) le.setFreezeTicks(frost);
         }
     }
 
@@ -371,7 +376,8 @@ public final class GanyuBudListener implements Listener {
 
         double dx = le.getLocation().getX() - center.getX();
         double dz = le.getLocation().getZ() - center.getZ();
-        return dx*dx + dz*dz <= RING_RADIUS * RING_RADIUS;
+        double radius = ringRadius();
+        return dx*dx + dz*dz <= radius * radius;
     }
 
 

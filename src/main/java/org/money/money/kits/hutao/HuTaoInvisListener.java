@@ -29,6 +29,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.money.money.session.KitResettable;
+import org.money.money.util.ItemModels;
 
 import java.util.*;
 
@@ -73,11 +74,13 @@ public final class HuTaoInvisListener implements Listener, KitResettable {
         im.setAttributeModifiers(null);
         AttributeModifier dmg = new AttributeModifier(
                 new NamespacedKey(plugin, "homa_damage"),
-                4, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND
+                org.money.money.meta.ClassRegistry.num("hutao", "homa", "damage", 4.0),
+                AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND
         );
         AttributeModifier spd = new AttributeModifier(
                 new NamespacedKey(plugin, "homa_speed"),
-                0.8, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND
+                org.money.money.meta.ClassRegistry.num("hutao", "homa", "attackSpeed", 0.8),
+                AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND
         );
         im.addAttributeModifier(Attribute.ATTACK_DAMAGE, dmg);
         im.addAttributeModifier(Attribute.ATTACK_SPEED, spd);
@@ -165,6 +168,7 @@ public final class HuTaoInvisListener implements Listener, KitResettable {
         im.displayName(Component.text("Remove Invis"));
         im.getPersistentDataContainer().set(KEY_REMOVE, PersistentDataType.BYTE, (byte) 1);
         im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        ItemModels.apply(im, "hutao_time");
         it.setItemMeta(im);
         return it;
     }
@@ -175,6 +179,7 @@ public final class HuTaoInvisListener implements Listener, KitResettable {
         im.displayName(Component.text("InvisTotem"));
         im.getPersistentDataContainer().set(KEY_INVIS_TOTEM, PersistentDataType.BYTE, (byte) 1);
         im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        ItemModels.apply(im, "hutao_toteminvis");
         it.setItemMeta(im);
         return it;
     }

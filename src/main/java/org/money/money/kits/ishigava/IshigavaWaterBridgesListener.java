@@ -19,6 +19,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 
 import java.util.HashMap;
 import java.util.List;
@@ -33,11 +34,11 @@ import java.util.UUID;
 public class IshigavaWaterBridgesListener implements Listener {
 
     private static final String NAME_OF_ISHIGAVA_BRIDGE = "Bridge";
-    private static final int MIN_DISTANCE = 5;
-    private static final int MAX_DISTANCE = 20;
     private static final int STEP = 1;
-    private static final int MAX_CHARGES = 5;
-    private static final long BRIDGE_COOLDOWN_MS = 45_000L;
+
+    private static int minDistance() { return ClassRegistry.numInt("ishigava", "bridge", "minDistance", 5); }
+    private static int maxDistance() { return ClassRegistry.numInt("ishigava", "bridge", "maxDistance", 20); }
+    private static int maxCharges()  { return ClassRegistry.numInt("ishigava", "bridge", "charges", 5); }
 
     private final Plugin plugin;
     private final Map<UUID, Integer> distanceMap = new HashMap<>();
@@ -91,12 +92,12 @@ public class IshigavaWaterBridgesListener implements Listener {
     }
 
     private int getDistance(Player player) {
-        return distanceMap.getOrDefault(player.getUniqueId(), MIN_DISTANCE);
+        return distanceMap.getOrDefault(player.getUniqueId(), minDistance());
     }
 
     private void changeDistance(Player player, int delta) {
         int current = getDistance(player);
-        int updated = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, current + delta));
+        int updated = Math.max(minDistance(), Math.min(maxDistance(), current + delta));
         distanceMap.put(player.getUniqueId(), updated);
         showDistance(player, updated);
     }
@@ -108,7 +109,8 @@ public class IshigavaWaterBridgesListener implements Listener {
     private void placeBridge(Player player) {
         UUID id = player.getUniqueId();
         long now = System.currentTimeMillis();
-        int ch = chargesMap.getOrDefault(id, MAX_CHARGES);
+        int maxCharges = maxCharges();
+        int ch = chargesMap.getOrDefault(id, maxCharges);
 
         // Out of charges -> 45s cooldown, then the 5 charges refill.
         if (ch <= 0) {
@@ -118,7 +120,7 @@ public class IshigavaWaterBridgesListener implements Listener {
                 player.sendActionBar(Component.text("Bridges: " + sec + " sec", NamedTextColor.RED));
                 return;
             }
-            ch = MAX_CHARGES;
+            ch = maxCharges;
         }
 
         int distance = getDistance(player);
@@ -134,10 +136,11 @@ public class IshigavaWaterBridgesListener implements Listener {
         ch--;
         chargesMap.put(id, ch);
         if (ch <= 0) {
-            cooldownUntil.put(id, now + BRIDGE_COOLDOWN_MS);
-            player.sendActionBar(Component.text("Bridges spent — 45s cooldown", NamedTextColor.GRAY));
+            long cooldownMs = ClassRegistry.millis("ishigava", "bridge", 45_000L);
+            cooldownUntil.put(id, now + cooldownMs);
+            player.sendActionBar(Component.text("Bridges spent — " + (cooldownMs / 1000) + "s cooldown", NamedTextColor.GRAY));
         } else {
-            player.sendActionBar(Component.text("Bridges: " + ch + "/" + MAX_CHARGES, NamedTextColor.AQUA));
+            player.sendActionBar(Component.text("Bridges: " + ch + "/" + maxCharges, NamedTextColor.AQUA));
         }
     }
 
@@ -170,7 +173,7 @@ public class IshigavaWaterBridgesListener implements Listener {
                 }
             }
             armorStand.remove();
-        }, 400L);
+        }, ClassRegistry.numInt("ishigava", "bridge", "lifetimeTicks", 400));
     }
 
     private boolean isBridgeItem(ItemStack item) {

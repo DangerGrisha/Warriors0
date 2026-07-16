@@ -14,6 +14,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
+import org.money.money.util.ItemModels;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,6 +47,7 @@ public class SaskeSwordListener implements Listener {
         meta.displayName(Component.text(KATANA_NAME));
         meta.setUnbreakable(true);
         meta.setLore(List.of("something"));
+        ItemModels.apply(meta, "katanasaske_saske_katana_remake");
         sword.setItemMeta(meta);
         return sword;
     }
@@ -58,10 +61,10 @@ public class SaskeSwordListener implements Listener {
         if (isSwordEvent(event, player)) {
             UUID uuid = player.getUniqueId();
             long currentTime = System.currentTimeMillis();
+            long cooldown = ClassRegistry.millis("saske", "katana", 6000L);
 
             if (cooldownMap.containsKey(uuid)) {
                 long timePassed = currentTime - cooldownMap.get(uuid);
-                long cooldown = 6000;
                 if (timePassed < cooldown) {
                     return;
                 }
@@ -69,7 +72,7 @@ public class SaskeSwordListener implements Listener {
 
             cooldownMap.put(uuid, currentTime);
             executeSwordAbility(player);
-            startCooldownTimer(player, 6);
+            startCooldownTimer(player, (int) (cooldown / 1000));
         }
     }
 
@@ -105,7 +108,8 @@ public class SaskeSwordListener implements Listener {
     }
 
     private void pushPlayerBack(Player player) {
-        Vector direction = player.getLocation().getDirection().multiply(-0.8);
+        double dashBackPower = ClassRegistry.num("saske", "katana", "dashBackPower", 0.8);
+        Vector direction = player.getLocation().getDirection().multiply(-dashBackPower);
         player.setVelocity(player.getVelocity().add(direction));
     }
 
@@ -126,13 +130,13 @@ public class SaskeSwordListener implements Listener {
     }
 
     private void applyDamageAndPushEntities(World world, Location location, Player player) {
-        double damageRadius = 1.0;
-        Vector pushDirection = player.getLocation().getDirection().normalize().multiply(1.5);
+        double damageRadius = ClassRegistry.num("saske", "katana", "damageRadius", 1.0);
+        Vector pushDirection = player.getLocation().getDirection().normalize().multiply(ClassRegistry.num("saske", "katana", "knockback", 1.5));
 
         Collection<Entity> entities = world.getNearbyEntities(location, damageRadius, damageRadius, damageRadius);
         for (Entity entity : entities) {
             if (entity instanceof LivingEntity livingEntity && !entity.equals(player)) {
-                livingEntity.damage(5.0);
+                livingEntity.damage(ClassRegistry.num("saske", "katana", "damage", 5.0));
                 livingEntity.setVelocity(pushDirection);
                 world.spawnParticle(Particle.CRIT, livingEntity.getLocation(), 5, 0.3, 0.3, 0.3, 0.05);
             }

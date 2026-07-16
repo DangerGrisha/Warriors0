@@ -14,12 +14,13 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.money.money.util.ItemModels;
 
 public final class UrarakaGloveListener implements Listener {
 
-    private static final int  STUN_TICKS = 20;  // 1 секунда
-    private static final int  STUN_LEVEL = 1;   // Slowness II (0 = I, 1 = II). Можно поднять.
-    private static final double STUN_RADIUS = 1.5; // игрок должен быть в 1 блоке от цели
+    private static int STUN_TICKS() { return org.money.money.meta.ClassRegistry.numInt("uraraka", "glove", "stunDurationTicks", 20); }  // 1 секунда
+    private static int STUN_LEVEL() { return org.money.money.meta.ClassRegistry.numInt("uraraka", "glove", "stunAmplifier", 1); }   // Slowness II (0 = I, 1 = II). Можно поднять.
+    private static double STUN_RADIUS() { return org.money.money.meta.ClassRegistry.num("uraraka", "glove", "stunRadius", 1.5); } // игрок должен быть в 1 блоке от цели
 
     private final Plugin plugin;
     private final NamespacedKey KEY_GLOVE;
@@ -38,6 +39,7 @@ public final class UrarakaGloveListener implements Listener {
         im.getPersistentDataContainer().set(KEY_GLOVE, PersistentDataType.BYTE, (byte)1);
         // косметика по желанию:
         // im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
+        ItemModels.apply(im, "uraraka_diohand");
         it.setItemMeta(im);
         return it;
     }
@@ -63,10 +65,10 @@ public final class UrarakaGloveListener implements Listener {
         if (!isCritical(e, attacker)) return;
 
         // владелец достаточно близко к цели (<= 1 блок)
-        if (attacker.getLocation().distanceSquared(victim.getLocation()) > STUN_RADIUS * STUN_RADIUS) return;
+        if (attacker.getLocation().distanceSquared(victim.getLocation()) > STUN_RADIUS() * STUN_RADIUS()) return;
 
         // применяем "оглушение" — короткий Slowness
-        victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, STUN_TICKS, STUN_LEVEL, false, true, true));
+        victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, STUN_TICKS(), STUN_LEVEL(), false, true, true));
 
         // немного фидбэка
         try {

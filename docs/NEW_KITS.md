@@ -152,20 +152,77 @@ non-bedrock/unbreakable block in radius).
 - `TimeWalker`: `run`, `slash`, `momentum`, `ult`
 - `Blastborn`: `gloves`, `grenade`, `ult`, `machinegun`
 - `Ishigava`: …existing… + `clones`
+- `BlueRose` (aka `Guardian`/`brg`): `oath`, `ward`, `rosebind`, `petal`, `heritage`, `garden`
 
-Giving any Blastborn item also tags the player `Blastborn` (so the meter shows). Giving Mirror
-Clones / TimeWalker ult requires Citizens on the server for the NPC clones to render.
+Giving any Blastborn item also tags the player `Blastborn` (so the meter shows). Giving any Blue Rose
+Guardian item tags the player `BlueRoseGuardian`. Giving Mirror Clones / TimeWalker ult requires
+Citizens on the server for the NPC clones to render.
 
 ---
 
-## 5. Config map (new sections in `src/main/resources/config.yml`)
+## 5. Blue Rose Guardian (legendary Defender / Support / Zone Controller)
+
+Класс на силе живых голубых морозных роз. Не дамагер: выигрывает пространство, защищает флагоносца,
+спасает союзников и ломает push контролем зон. Пакет `org.money.money.kits.bluerose`.
+
+### Core — Rose Seed (`RoseSeedService`)
+Метки роз. На **враге** — опасная (раскрывается в slow/шипы/бонус-урон), на **союзнике** — защитная
+(усиливает лечение от роз, ставится Heritage Bloom'ом). Максимум 1 метка каждого вида на цель;
+повторное наложение обновляет/раскрывает. Союзники не получают дебаффов, враги — лечения/щита. Все
+семена чистятся при death/quit/спектатор/смене мира/конце игры.
+
+### Passive — Bloodline Bloom
+Если рядом (`flagCarrierRange=8`) союзный флагоносец (или сам Guardian с флагом) — розы живут дольше
+(`×1.25`), радиус `+0.5`, лечение/щит/emergency `×1.15`, knockback радиус `+0.5`. Детект флага —
+best-effort: scoreboard-теги (`flag-carrier-tags`) и/или предмет с `item_model lastwar:banner_*`
+(`flag-item-model-prefixes`), настраивается в `config.yml`.
+
+### Abilities
+- **Blue Rose Ward** (`ward`, cd 16s): ПКМ по блоку → зона (radius 4, 10s, макс 2). Союзникам heal+
+  Resistance+очистка, врагам Slowness/Weakness+Rose Seed. Роза исчезает, если опору сломали.
+- **Rosebind** (`rosebind`, cd 11s): ПКМ → линия роз по земле; первый враг — root(1s)+slow+seed+урон;
+  на засеянном — раскрытие и +root. Не сквозь стены, не по союзникам. Root = лок горизонтали (камера/
+  прыжки живут), не ломает физику.
+- **Petal Step** (`petal`, cd 10s): ПКМ → рывок 6.5 (не сквозь стены) + дорожка лепестков сакуры 4s
+  (розовая, на уровне ног — зона в один блок высотой): союзникам Speed (+маленький heal при входе),
+  врагам slow+seed.
+- **Heritage Bloom** (`heritage`, cd 26s): ПКМ по союзнику (или ближайшему перед взглядом; иначе на себя
+  слабее) → щит-абсорбция + ally seed. При здоровье < 30% роза раскрывается: heal/щит, отбрасывает+
+  замораживает врагов, краткая неуязвимость (одна страховка). Per-target emergency cd.
+- **Garden of the First Rose** (`garden`, ult, cd 100s): ПКМ по земле → сад (radius 7.5, 8s): союзникам
+  heal+Resistance, флагоносцу Speed, врагам slow+ледяные шипы. **First Rose Salvation**: первый союзник,
+  который должен был умереть в саду, остаётся на 1 HP + неуязвимость + отброс/freeze врагов (1 раз).
+- **Rose Oath** (`oath`, меч): удар по врагу с активным семенем → раскрытие (slow+шип+бонус-урон),
+  внутренний кд на цель. Участие в бою без burst.
+
+### Death-save / урон
+`BlueRoseGuardianManager#onDamage` (HIGHEST) делает три вещи: гасит урон в окно неуязвимости;
+Heritage emergency при критическом/летальном уроне; Garden First Rose Salvation при летальном. Всё —
+через `EntityDamageEvent` (отмена/1 HP), без вмешательства в `PlayerDeathEvent`. VOID спасается только
+при `allow-void-save: true`, `/kill` (cause KILL) не спасается.
+
+### Lifecycle
+`BlueRoseGuardianManager` — единственный `KitResettable` класса (держит всё «мировое» состояние:
+семена, Heritage-розы, активные зоны Ward/Garden/Trail, root/invuln, кулдауны). `resetPlayer` чистит
+игрока и как Guardian'а, и как цель. `Main.onDisable` → `blueRose.stop()`. Якоря роз — невидимые
+marker-ArmorStand'ы (≤3 на Guardian'а), снимаются вместе с зоной; всё остальное на частицах.
+
+---
+
+## 6. Config map (new sections in `src/main/resources/config.yml`)
 
 - `timewalker.{run,slash,momentum,ult}.*` — TimeWalker (top-level).
 - `classes.blastborn.*` — Blastborn (`selfKnockbackMultiplier`, `selfDestruction`, `gloves`,
   `grenade`, `machineGun`, `ultimate`).
 - `ishigava.clones.*` — Mirror Clones (the older Ishigava abilities use in-listener constants).
+- `classes.blue_rose_guardian.*` — Blue Rose Guardian: **только тогглы** (`death-save-enabled`,
+  `allow-void-save`, `self-cast-enabled`, `self-cast-multiplier`) и детект флага
+  (`flag-carrier-tags`, `flag-item-model-prefixes`). Весь числовой баланс/кулдауны — в
+  `classes.json` (ключ `blue_rose_guardian`), как у всех китов.
 
-## 6. Lifecycle / cleanup (all new abilities)
+---
+
+## 7. Lifecycle / cleanup (all new abilities)
 
 Every stateful listener implements `KitResettable`; `SessionManager` + `KitSession.isInGame`
 guards stop abilities, tasks, NPC clones, bossbars and scoreboard tags from leaking into the lobby

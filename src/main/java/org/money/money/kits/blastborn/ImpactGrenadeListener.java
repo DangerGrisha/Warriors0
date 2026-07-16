@@ -32,6 +32,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -63,16 +64,8 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
     private final NamespacedKey KEY_GRENADE;
     private final NamespacedKey KEY_PROJECTILE;
 
-    // ===== Config (read once) =====
-    private final long cooldownMs;
-    private final int primeTicks;
-    private final double projectileSpeed;
-    private final double explosionRadius;
-    private final double blockBreakRadius;
-    private final double damage;
-    private final double knockback;
+    // ===== Config (read once; non-balance toggles only — balance numbers come from ClassRegistry at use time) =====
     private final boolean friendlyFire;
-    private final int selfDestructionGain;
     private final boolean allowGrenadeDuringUltimate;
 
     // ===== Per-player state =====
@@ -91,17 +84,13 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
         this.KEY_GRENADE = new NamespacedKey(plugin, "blastborn_grenade");
         this.KEY_PROJECTILE = new NamespacedKey(plugin, "blastborn_grenade_projectile");
 
-        int cooldownTicks = Math.max(0, plugin.getConfig().getInt("classes.blastborn.grenade.cooldownTicks", 600));
-        this.cooldownMs = cooldownTicks * 50L;
-        this.primeTicks = Math.max(0, plugin.getConfig().getInt("classes.blastborn.grenade.primeTicks", 20));
-        this.projectileSpeed = plugin.getConfig().getDouble("classes.blastborn.grenade.projectileSpeed", 1.9);
-        this.explosionRadius = plugin.getConfig().getDouble("classes.blastborn.grenade.explosionRadius", 4.0);
-        this.blockBreakRadius = plugin.getConfig().getDouble("classes.blastborn.grenade.blockBreakRadius", 3.0);
-        this.damage = plugin.getConfig().getDouble("classes.blastborn.grenade.damage", 12.0);
-        this.knockback = plugin.getConfig().getDouble("classes.blastborn.grenade.knockback", 1.5);
         this.friendlyFire = plugin.getConfig().getBoolean("classes.blastborn.grenade.friendlyFire", false);
-        this.selfDestructionGain = plugin.getConfig().getInt("classes.blastborn.grenade.selfDestructionGain", 0);
         this.allowGrenadeDuringUltimate = plugin.getConfig().getBoolean("classes.blastborn.ultimate.allowGrenadeDuringUltimate", false);
+    }
+
+    /** Pin-pull charge-up window (ticks), read at use time so /warriors reload applies. */
+    private static int primeTicks() {
+        return Math.max(0, ClassRegistry.numInt("blastborn", "grenade", "primeTicks", 20));
     }
 
     /* ================== Item ================== */
@@ -152,6 +141,8 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
         if (priming.contains(id)) return;
 
         long now = System.currentTimeMillis();
+        // Cooldown read at use time so /warriors reload applies without restart.
+        long cooldownMs = Math.max(0, ClassRegistry.ticks("blastborn", "grenade", 600)) * 50L;
         if (cooldownMap.containsKey(id)) {
             long last = cooldownMap.get(id);
             long passed = now - last;
@@ -180,6 +171,8 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
         w.playSound(p.getLocation(), Sound.BLOCK_LEVER_CLICK, 1.0f, 1.2f);
         w.playSound(p.getLocation(), Sound.ENTITY_CREEPER_PRIMED, 1.0f, 1.2f);
         w.spawnParticle(Particle.LARGE_SMOKE, p.getLocation().add(0, 1.0, 0), 10, 0.25, 0.4, 0.25, 0.02);
+
+        final int primeTicks = primeTicks();
 
         // Slow the thrower for the prime window (clamped to >= 1 tick when there is a window).
         if (primeTicks > 0) {
@@ -214,6 +207,8 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
     /* ================== Throw ================== */
 
     private void throwGrenade(Player p) {
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        double projectileSpeed = ClassRegistry.num("blastborn", "grenade", "projectileSpeed", 1.9);
         Vector velocity = p.getEyeLocation().getDirection().multiply(projectileSpeed);
         Snowball sb = p.launchProjectile(Snowball.class, velocity);
         sb.setShooter(p);
@@ -254,6 +249,7 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
         cooldownMap.put(p.getUniqueId(), System.currentTimeMillis());
 
         // Optional self-destruction meter gain on throw.
+        int selfDestructionGain = ClassRegistry.numInt("blastborn", "grenade", "selfDestructionGain", 0);
         if (selfDestructionGain > 0) {
             manager.addPoints(p, selfDestructionGain);
         }
@@ -293,6 +289,11 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
         }
 
         // Manual explosion — never a real world explosion.
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        final double explosionRadius = ClassRegistry.num("blastborn", "grenade", "explosionRadius", 4.0);
+        final double blockBreakRadius = ClassRegistry.num("blastborn", "grenade", "blockBreakRadius", 3.0);
+        final double damage = ClassRegistry.num("blastborn", "grenade", "damage", 12.0);
+        final double knockback = ClassRegistry.num("blastborn", "grenade", "knockback", 1.5);
         ExplosionUtil.visualExplosion(at, 4f, true);
         ExplosionUtil.knockbackPlayers(at, explosionRadius, knockback, 0.5, shooter, true, false);
         ExplosionUtil.damagePlayers(at, explosionRadius, damage, shooter, false, 1.0, friendlyFire);
@@ -324,7 +325,7 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
         }
         BukkitTask t = primeTasks.remove(id);
         if (t != null) t.cancel();
-        if (primeTicks > 0) p.removePotionEffect(PotionEffectType.SLOWNESS);
+        if (primeTicks() > 0) p.removePotionEffect(PotionEffectType.SLOWNESS);
     }
 
     /* ================== Cleanup / lifecycle ================== */
@@ -351,7 +352,7 @@ public final class ImpactGrenadeListener implements Listener, KitResettable {
         UUID id = p.getUniqueId();
         BukkitTask t = primeTasks.remove(id);
         if (t != null) t.cancel();
-        if (priming.remove(id) && primeTicks > 0) {
+        if (priming.remove(id) && primeTicks() > 0) {
             p.removePotionEffect(PotionEffectType.SLOWNESS);
         }
         cooldownMap.remove(id);

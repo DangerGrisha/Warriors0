@@ -26,6 +26,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -50,17 +51,6 @@ public final class TimeWalkerSlashListener implements Listener, KitResettable {
 
     private final NamespacedKey KEY_PERFECT_SEVER;
 
-    // ====== Config tunables (read once in constructor) ======
-    private final int cooldownSeconds;
-    private final long cooldownMs;
-    private final int iframeTicks;
-    private final double forwardLaunch;
-    private final double slashRange;
-    private final double baseDamage;
-    private final double speedMultiplier;
-    private final double minDamage;
-    private final double maxDamage;
-
     // cooldown stores last use time ms
     private final Map<UUID, Long> cooldownMap = new HashMap<>();
 
@@ -77,16 +67,6 @@ public final class TimeWalkerSlashListener implements Listener, KitResettable {
     public TimeWalkerSlashListener(Plugin plugin) {
         this.plugin = Objects.requireNonNull(plugin);
         this.KEY_PERFECT_SEVER = new NamespacedKey(plugin, "timewalker_perfect_sever");
-
-        this.cooldownSeconds = plugin.getConfig().getInt("timewalker.slash.cooldown-seconds", 8);
-        this.cooldownMs = this.cooldownSeconds * 1000L;
-        this.iframeTicks = plugin.getConfig().getInt("timewalker.slash.iframe-ticks", 8);
-        this.forwardLaunch = plugin.getConfig().getDouble("timewalker.slash.forward-launch", 0.6);
-        this.slashRange = plugin.getConfig().getDouble("timewalker.slash.range", 6.0);
-        this.baseDamage = plugin.getConfig().getDouble("timewalker.slash.base-damage", 5.0);
-        this.speedMultiplier = plugin.getConfig().getDouble("timewalker.slash.speed-multiplier", 13.5);
-        this.minDamage = plugin.getConfig().getDouble("timewalker.slash.min-damage", 5.0);
-        this.maxDamage = plugin.getConfig().getDouble("timewalker.slash.max-damage", 20.0);
     }
 
     /* ================== Item ================== */
@@ -168,6 +148,10 @@ public final class TimeWalkerSlashListener implements Listener, KitResettable {
         UUID id = p.getUniqueId();
         long now = System.currentTimeMillis();
 
+        // Cooldown read at use time so /warriors reload applies without restart.
+        int cooldownSeconds = ClassRegistry.seconds("timewalker", "slash", 8);
+        long cooldownMs = cooldownSeconds * 1000L;
+
         if (cooldownMap.containsKey(id)) {
             long last = cooldownMap.get(id);
             long passed = now - last;
@@ -225,6 +209,15 @@ public final class TimeWalkerSlashListener implements Listener, KitResettable {
     private void castPerfectSever(Player caster) {
         World w = caster.getWorld();
         final UUID casterId = caster.getUniqueId();
+
+        // Balance numbers read at use time (per cast) so /warriors reload applies without restart.
+        final int iframeTicks = ClassRegistry.numInt("timewalker", "slash", "iframeTicks", 8);
+        final double forwardLaunch = ClassRegistry.num("timewalker", "slash", "forwardLaunch", 0.6);
+        final double slashRange = ClassRegistry.num("timewalker", "slash", "rangeBlocks", 6.0);
+        final double baseDamage = ClassRegistry.num("timewalker", "slash", "baseDamage", 5.0);
+        final double speedMultiplier = ClassRegistry.num("timewalker", "slash", "speedMultiplier", 13.5);
+        final double minDamage = ClassRegistry.num("timewalker", "slash", "minDamage", 5.0);
+        final double maxDamage = ClassRegistry.num("timewalker", "slash", "maxDamage", 20.0);
 
         // Enhanced look if any TimeWalker buff is active.
         boolean enhanced = caster.getScoreboardTags().contains(TAG_FUTURE_RUN)

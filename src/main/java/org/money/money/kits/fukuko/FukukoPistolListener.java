@@ -15,6 +15,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 
 import java.util.HashSet;
 import java.util.List;
@@ -34,9 +35,8 @@ public final class FukukoPistolListener implements Listener {
     private final NamespacedKey KEY_PISTOL;
 
     // числа 1:1 из FukukoConstants
-    private static final double DAMAGE_OF_BULLET = 1.0;
-    private static final long   COOLDOWN_TICKS    = 100L; // 5с между выстрелами
-    private static final long   REMOVE_BULLET_AFTER = 22L; // время жизни пули
+    private static double DAMAGE_OF_BULLET() { return ClassRegistry.num("fukuko", "pistol", "bulletDamage", 1.0); }
+    private static long REMOVE_BULLET_AFTER() { return ClassRegistry.numInt("fukuko", "pistol", "bulletLifetimeTicks", 22); } // время жизни пули
 
     // состояние per-игрок
     private final Set<UUID> onCooldown = new HashSet<>();
@@ -102,10 +102,11 @@ public final class FukukoPistolListener implements Listener {
         shootSystem(player);
 
         // кулдаун 100 тиков
+        long cooldownTicks = ClassRegistry.ticks("fukuko", "pistol", 100);
         onCooldown.add(id);
         new BukkitRunnable() {
             @Override public void run() { onCooldown.remove(id); }
-        }.runTaskLater(plugin, COOLDOWN_TICKS);
+        }.runTaskLater(plugin, cooldownTicks);
     }
 
     /* ===================== Стрельба (1:1) ===================== */
@@ -118,8 +119,8 @@ public final class FukukoPistolListener implements Listener {
     }
 
     private void shoot(Player player, ArmorStand armorStand, Vector direction) {
-        // удалить пулю через REMOVE_BULLET_AFTER тиков
-        Bukkit.getScheduler().runTaskLater(plugin, armorStand::remove, REMOVE_BULLET_AFTER);
+        // удалить пулю через REMOVE_BULLET_AFTER() тиков
+        Bukkit.getScheduler().runTaskLater(plugin, armorStand::remove, REMOVE_BULLET_AFTER());
 
         Vector finalDirection = direction.clone();
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -127,7 +128,7 @@ public final class FukukoPistolListener implements Listener {
                 checkBulletCollision(armorStand, player);
                 // лёгкая компенсация гравитации
                 finalDirection.setY(finalDirection.getY() + 0.006);
-                armorStand.setVelocity(finalDirection.clone().normalize().multiply(1.0));
+                armorStand.setVelocity(finalDirection.clone().normalize().multiply(ClassRegistry.num("fukuko", "pistol", "bulletSpeed", 1.0)));
                 checkBulletCollision(armorStand, player);
             }
         }, 0L, 2L);
@@ -139,9 +140,9 @@ public final class FukukoPistolListener implements Listener {
 
         for (Player nearbyPlayer : Bukkit.getOnlinePlayers()) {
             if (nearbyPlayer.equals(shooter)) continue;
-            if (nearbyPlayer.getLocation().distance(bulletLocation) <= 1.0) {
+            if (nearbyPlayer.getLocation().distance(bulletLocation) <= ClassRegistry.num("fukuko", "pistol", "bulletHitRadius", 1.0)) {
                 if (!nearbyPlayer.isInvulnerable()) {
-                    nearbyPlayer.damage(DAMAGE_OF_BULLET);
+                    nearbyPlayer.damage(DAMAGE_OF_BULLET());
                     nearbyPlayer.getWorld().playSound(nearbyPlayer.getLocation(),
                             Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.0f);
                 }

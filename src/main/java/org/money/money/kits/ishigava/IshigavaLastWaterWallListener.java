@@ -20,6 +20,8 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
+import org.money.money.util.ItemModels;
 
 import java.util.HashMap;
 import java.util.List;
@@ -35,8 +37,8 @@ import java.util.UUID;
 public class IshigavaLastWaterWallListener implements Listener {
 
     private static final String NAME_OF_ISHIGAVA_WALL = "Last Wall";
-    private static final int MAX_BEACONS = 12;
-    private static final long WALL_COOLDOWN_MS = 3 * 60 * 1000L;
+
+    private static int beaconCount() { return ClassRegistry.numInt("ishigava", "wall", "beaconCount", 12); }
 
     private boolean isOn = false;
     private boolean isInteracted = false;
@@ -74,8 +76,8 @@ public class IshigavaLastWaterWallListener implements Listener {
                 return;
             }
             isOn = true;
-            initiateCycle(player, MAX_BEACONS);
-            cooldownUntil.put(player.getUniqueId(), now + WALL_COOLDOWN_MS);
+            initiateCycle(player, beaconCount());
+            cooldownUntil.put(player.getUniqueId(), now + ClassRegistry.millis("ishigava", "wall", 180_000L));
 
             isInteracted = true;
             new BukkitRunnable() {
@@ -100,11 +102,11 @@ public class IshigavaLastWaterWallListener implements Listener {
     }
 
     private void initiateCycle(Player player, int maxBeacons) {
-        spawnArmorStandsRecursively(player, player.getLocation(), player.getLocation().getDirection(), maxBeacons);
-        spawnArmorStandsRecursively(player, player.getLocation().add(0, 4, 0), player.getLocation().getDirection(), maxBeacons);
+        spawnArmorStandsRecursively(player, player.getLocation(), player.getLocation().getDirection(), maxBeacons, maxBeacons);
+        spawnArmorStandsRecursively(player, player.getLocation().add(0, 4, 0), player.getLocation().getDirection(), maxBeacons, maxBeacons);
     }
 
-    private void spawnArmorStandsRecursively(Player player, Location currentLocation, Vector direction, int remainingBeacons) {
+    private void spawnArmorStandsRecursively(Player player, Location currentLocation, Vector direction, int remainingBeacons, int initialBeacons) {
         if (remainingBeacons <= 0) {
             return;
         }
@@ -114,7 +116,7 @@ public class IshigavaLastWaterWallListener implements Listener {
         double distanceToBeacon;
         double distanceToDuration;
         double distanceToTemporary;
-        if (remainingBeacons == MAX_BEACONS) {
+        if (remainingBeacons == initialBeacons) {
             distanceToBeacon = 2.6;
             distanceToDuration = 2.5;
             distanceToTemporary = 1.345;
@@ -135,7 +137,7 @@ public class IshigavaLastWaterWallListener implements Listener {
             public void run() {
                 temporary.setRotation(player.getLocation().getYaw(), 0);
                 if (isOn) {
-                    spawnArmorStandsRecursively(player, temporary.getLocation().add(0, 8, 0), temporary.getLocation().getDirection(), remainingBeacons - 1);
+                    spawnArmorStandsRecursively(player, temporary.getLocation().add(0, 8, 0), temporary.getLocation().getDirection(), remainingBeacons - 1, initialBeacons);
                 }
             }
         }.runTaskLater(plugin, 20);
@@ -158,6 +160,7 @@ public class IshigavaLastWaterWallListener implements Listener {
             ItemStack limeDye = new ItemStack(Material.LIME_DYE);
             ItemMeta dyeMeta = limeDye.getItemMeta();
             dyeMeta.displayName(Component.text("Last Wall"));
+            ItemModels.apply(dyeMeta, "ishigava_last_water_wall_last_water_wall");
             limeDye.setItemMeta(dyeMeta);
             armorStand.getEquipment().setItemInMainHand(limeDye);
         } else {
@@ -235,7 +238,7 @@ public class IshigavaLastWaterWallListener implements Listener {
                 newLocation.setY(currentY);
                 armorStand.teleport(newLocation);
             }
-        }.runTaskTimer(plugin, 1200L, 1L); // стена держится ~1 минуту перед опусканием
+        }.runTaskTimer(plugin, ClassRegistry.numInt("ishigava", "wall", "holdTicks", 1200), 1L); // стена держится ~1 минуту перед опусканием
         return armorStand;
     }
 

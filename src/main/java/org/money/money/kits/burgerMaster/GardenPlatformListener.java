@@ -16,6 +16,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.money.money.meta.ClassRegistry;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -26,8 +27,6 @@ import java.util.concurrent.TimeUnit;
  * Через 2.5 минуты предмет возвращается владельцу (если у него его нет).
  */
 public final class GardenPlatformListener implements Listener {
-
-    private static final long RETURN_DELAY_MS = 60_000L; // 1 мин real-time (кулдаун возврата)
 
     private final Plugin plugin;
     private final NamespacedKey KEY_ITEM; // маркер нашего блока-предмета
@@ -80,13 +79,14 @@ public final class GardenPlatformListener implements Listener {
         });
 
         // планируем возврат предмета через 2.5 мин (real-time)
+        long returnDelayMs = ClassRegistry.millis("burgermaster", "garden", 60_000L);
         UUID id = p.getUniqueId();
-        long backAt = System.currentTimeMillis() + RETURN_DELAY_MS;
+        long backAt = System.currentTimeMillis() + returnDelayMs;
         cooldownUntilMs.put(id, backAt);
         Bukkit.getAsyncScheduler().runDelayed(
                 plugin,
                 task -> Bukkit.getScheduler().runTask(plugin, () -> giveBackIfMissing(id)),
-                RETURN_DELAY_MS,
+                returnDelayMs,
                 TimeUnit.MILLISECONDS
         );
     }
@@ -100,8 +100,9 @@ public final class GardenPlatformListener implements Listener {
         int cz = centerBlockLoc.getBlockZ();
 
         // 1) 5×5 farmland, центр — вода. Засеять пшеницу (age 0).
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
+        int half = ClassRegistry.numInt("burgermaster", "garden", "platformHalfSize", 2);
+        for (int dx = -half; dx <= half; dx++) {
+            for (int dz = -half; dz <= half; dz++) {
                 int x = cx + dx, y = cy, z = cz + dz;
 
                 if (dx == 0 && dz == 0) {
@@ -131,9 +132,10 @@ public final class GardenPlatformListener implements Listener {
         }
 
         // 2) Забор вокруг (кольцо 7×7 по периметру), ставим только в воздух.
-        for (int dx = -3; dx <= 3; dx++) {
-            for (int dz = -3; dz <= 3; dz++) {
-                if (Math.abs(dx) != 3 && Math.abs(dz) != 3) continue; // только рамка
+        int ring = half + 1;
+        for (int dx = -ring; dx <= ring; dx++) {
+            for (int dz = -ring; dz <= ring; dz++) {
+                if (Math.abs(dx) != ring && Math.abs(dz) != ring) continue; // только рамка
                 int x = cx + dx, y = cy, z = cz + dz;
                 setIfAir(w, x, y+1, z, Material.OAK_FENCE);
             }

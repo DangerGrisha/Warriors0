@@ -18,6 +18,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.entity.Player;
 import org.money.money.session.KitSession;
+import org.money.money.meta.ClassRegistry;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -26,11 +27,9 @@ import java.util.concurrent.TimeUnit;
 public final class HungryMasterListener implements Listener {
 
     // тайминги
-    private static final long EAT_WINDOW_TICKS   = 20L * 10;   // 10 секунд окно на бургеры
+    private static long EAT_WINDOW_TICKS() { return ClassRegistry.numInt("burgermaster", "hungry", "eatWindowTicks", 200); }   // 10 секунд окно на бургеры
     private static final long HUNGER_TICKS       = 20L * 5;    // 5 сек сильный голод
-    private static final long BEAST_TICKS        = 20L * 60;   // 60 сек зверь
-    private static final long RETURN_AFTER_BEAST = 60_000L;    // +1 мин к возврату
-    private static final long RETURN_AFTER_FAIL  = 60_000L;    // если провал, вернём через ~минуту
+    private static long BEAST_TICKS() { return ClassRegistry.numInt("burgermaster", "hungry", "beastDurationTicks", 1200); }   // 60 сек зверь
     private static final long TICK_MS            = 50L;
 
     // антидубликация событий потребления (антидребезг)
@@ -124,12 +123,13 @@ public final class HungryMasterListener implements Listener {
             p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.6f, 0.8f);
 
             // план возврата предмета через ~минуту после фейла
-            long back = System.currentTimeMillis() + RETURN_AFTER_FAIL;
+            long returnAfterFail = ClassRegistry.millis("burgermaster", "hungry", 60_000L);
+            long back = System.currentTimeMillis() + returnAfterFail;
             returnAtMs.put(id, back);
             Bukkit.getAsyncScheduler().runDelayed(plugin,
                     t -> Bukkit.getScheduler().runTask(plugin, () -> giveBackIfMissing(id)),
-                    RETURN_AFTER_FAIL, TimeUnit.MILLISECONDS);
-        }, EAT_WINDOW_TICKS);
+                    returnAfterFail, TimeUnit.MILLISECONDS);
+        }, EAT_WINDOW_TICKS());
     }
 
     /* ========== Подсчёт бургеров (с антидребезгом) ========== */
@@ -156,7 +156,7 @@ public final class HungryMasterListener implements Listener {
         eatCounter.put(id, nowCount);
         p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.4f);
 
-        if (nowCount >= 3) {
+        if (nowCount >= ClassRegistry.numInt("burgermaster", "hungry", "burgersRequired", 3)) {
             // успех — запустить режим зверя
             activeWindow.remove(id);
             eatCounter.remove(id);
@@ -170,24 +170,25 @@ public final class HungryMasterListener implements Listener {
 
         p.sendMessage(Component.text("БУЙСТВО! На 60 секунд.", NamedTextColor.RED));
         p.playSound(p.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.8f, 1.0f);
-        p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, (int)BEAST_TICKS, 9, false, true, true));
-        p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,             (int)BEAST_TICKS, 3, false, true, true));
-        p.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS,          (int)BEAST_TICKS, 5, false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, (int)BEAST_TICKS(), ClassRegistry.numInt("burgermaster", "hungry", "beastResistanceAmplifier", 9), false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,             (int)BEAST_TICKS(), ClassRegistry.numInt("burgermaster", "hungry", "beastSpeedAmplifier", 3), false, true, true));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS,          (int)BEAST_TICKS(), ClassRegistry.numInt("burgermaster", "hungry", "beastWeaknessAmplifier", 5), false, true, true));
         try {
             p.getWorld().spawnParticle(Particle.ANGRY_VILLAGER, p.getLocation().add(0,1,0), 30, 0.6, 0.8, 0.6, 0.02);
         } catch (Throwable ignored) {}
 
         // по окончании 60с — просто эффекты спадут, а предмет вернём ещё через минуту
-        long back = System.currentTimeMillis() + (BEAST_TICKS*TICK_MS) + RETURN_AFTER_BEAST; // 60с + 60с
+        long returnAfterBeast = ClassRegistry.millis("burgermaster", "hungry", 60_000L);
+        long back = System.currentTimeMillis() + (BEAST_TICKS()*TICK_MS) + returnAfterBeast; // 60с + 60с
         returnAtMs.put(id, back);
 
         Bukkit.getScheduler().runTaskLater(plugin, () ->
                         p.sendMessage(Component.text("Зверь успокоился.", NamedTextColor.GRAY)),
-                BEAST_TICKS);
+                BEAST_TICKS());
 
         Bukkit.getAsyncScheduler().runDelayed(plugin,
                 t -> Bukkit.getScheduler().runTask(plugin, () -> giveBackIfMissing(id)),
-                (BEAST_TICKS*TICK_MS) + RETURN_AFTER_BEAST,
+                (BEAST_TICKS()*TICK_MS) + returnAfterBeast,
                 TimeUnit.MILLISECONDS);
     }
 

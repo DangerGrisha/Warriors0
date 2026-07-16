@@ -3,11 +3,14 @@ package org.money.money.kits.ganyu.listeners;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
+import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Arrow;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
@@ -17,12 +20,15 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
 import org.money.money.combat.ElementalReactions;
+import org.money.money.session.KitSession;
+import org.money.money.util.ItemModels;
 
 import java.util.*;
 
@@ -36,22 +42,25 @@ public final class GanyuUltListener implements Listener {
     private final NamespacedKey KEY_SPHERE;      // на главном ArmorStand (IceSphere)
     private final NamespacedKey KEY_HITTER;      // на падающих ArmorStand’ах (IceHitter)
     private final NamespacedKey KEY_OWNER;       // UUID владельца (строкой) на сферах/хиттерах
+    private final NamespacedKey KEY_ARMED;       // стрела уже «взводится» (антидубль)
 
     // Параметры
-    private static final int    COOLDOWN_TICKS       = 20 * 150; // 2.5 мин
-    private static final int    SPHERE_LIFETIME      = 20 * 50;  // длительность «ульты» ~50c
-    private static final double SPHERE_RADIUS_XZ     = 30.0;     // радиус круга в небе
     private static final int    RING_POINTS          = 96;       // плотность круга
-
-    private static final int    RAIN_INTERVAL_TICKS  = 2;        // каждые 0.4с спавним «ледяную болванку»
     private static final int    HITTER_CHECK_TICKS   = 2;        // как часто проверять приземление
-    private static final double HITTER_IMPACT_RADIUS = 6.0;      // АОЕ при ударе
-    private static final double HITTER_DAMAGE        = 4;      // 2 ❤ урона
-
-    private static final int    FREEZE_ADD_TICKS     = 100;      // +5с инея
-    private static final int    SLOW_TICKS           = 80;       // 4с
-    private static final int    SLOW_LEVEL           = 1;        // Slowness II
     private static final String CRYO_TAG             = "Cryo";
+
+    // баланс — читается из ClassRegistry при использовании (def = прежние значения)
+    private static int    sphereLifetime()     { return org.money.money.meta.ClassRegistry.numInt("ganyu", "ult", "durationTicks", 1000); }
+    private static double sphereRadiusXz()     { return org.money.money.meta.ClassRegistry.num("ganyu", "ult", "fieldRadius", 30.0); }
+    private static int    rainIntervalTicks()  { return org.money.money.meta.ClassRegistry.numInt("ganyu", "ult", "rainIntervalTicks", 2); }
+    private static double hitterImpactRadius() { return org.money.money.meta.ClassRegistry.num("ganyu", "ult", "impactRadius", 6.0); }
+    private static double hitterDamage()       { return org.money.money.meta.ClassRegistry.num("ganyu", "ult", "damage", 4.0); }
+    private static int    freezeAddTicks()     { return org.money.money.meta.ClassRegistry.numInt("ganyu", "ult", "freezeAddTicks", 100); }
+    private static int    slowTicks()          { return org.money.money.meta.ClassRegistry.numInt("ganyu", "ult", "slowDurationTicks", 80); }
+    private static int    slowAmplifier()      { return org.money.money.meta.ClassRegistry.numInt("ganyu", "ult", "slowAmplifier", 1); }
+    private static double arrowDamage()        { return org.money.money.meta.ClassRegistry.num("ganyu", "ult", "arrowDirectDamage", 1.0); }
+    private static int    arrowFuseTicks()     { return org.money.money.meta.ClassRegistry.numInt("ganyu", "ult", "arrowFuseTicks", 20); }
+    private static double arrowSpeed()         { return org.money.money.meta.ClassRegistry.num("ganyu", "ult", "arrowSpeed", 0.6); }
 
     // Таски на центральную сферу
     private final Map<UUID, BukkitTask> spinTasks  = new HashMap<>();
@@ -68,6 +77,7 @@ public final class GanyuUltListener implements Listener {
         this.KEY_SPHERE   = new NamespacedKey(plugin, "ganyu_ult_sphere");
         this.KEY_HITTER   = new NamespacedKey(plugin, "ganyu_ult_hitter");
         this.KEY_OWNER    = new NamespacedKey(plugin, "ganyu_ult_owner");
+        this.KEY_ARMED    = new NamespacedKey(plugin, "ganyu_ult_armed");
     }
 
     /* ======================= ПРЕДМЕТ ======================= */
@@ -112,16 +122,18 @@ public final class GanyuUltListener implements Listener {
         else hand.setAmount(hand.getAmount() - 1);
         p.playSound(p.getLocation(), Sound.ITEM_TRIDENT_RIPTIDE_1, 0.7f, 1.6f);
 
-        // вернём через 2.5 минуты
+        // вернём по кулдауну (по UUID — переживает смерть/переподключение; в лобби не выдаём; без дубля)
+        final int cooldownTicks = org.money.money.meta.ClassRegistry.ticks("ganyu", "ult", 3000);
+        final UUID uid = p.getUniqueId();
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!p.isOnline()) return;
-            p.getInventory().addItem(makeUltItem());
-            p.sendMessage(
-                    Component.text("Everfrost Core", NamedTextColor.AQUA)
-                            .append(Component.text(" is ready again!", NamedTextColor.GRAY))
-            );
-            p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.45f, 1.7f);
-        }, COOLDOWN_TICKS);
+            Player online = Bukkit.getPlayer(uid);
+            if (online == null || !online.isOnline() || !KitSession.isInGame(online)) return;
+            for (ItemStack it : online.getInventory().getContents()) if (isUltItem(it)) return; // уже есть — не дублируем
+            online.getInventory().addItem(makeUltItem());
+            online.sendMessage(Component.text("Everfrost Core", NamedTextColor.AQUA)
+                    .append(Component.text(" is ready again!", NamedTextColor.GRAY)));
+            online.playSound(online.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.45f, 1.7f);
+        }, cooldownTicks);
 
         // центральная сфера на +10 по Y
         Location sphereLoc = p.getLocation().clone().add(0, 10, 0);
@@ -130,7 +142,7 @@ public final class GanyuUltListener implements Listener {
         // проживёт SPHERE_LIFETIME
         startSphereTasks(sphere);
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> removeSphere(sphere), SPHERE_LIFETIME);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> removeSphere(sphere), sphereLifetime());
     }
 
     /* ======================= СФЕРА ======================= */
@@ -154,6 +166,7 @@ public final class GanyuUltListener implements Listener {
             ItemStack redDye = new ItemStack(Material.HEART_OF_THE_SEA);
             ItemMeta dyeMeta = redDye.getItemMeta();
             dyeMeta.displayName(Component.text("freezeSmoke"));
+            ItemModels.apply(dyeMeta, "ganyu_smok1");
             redDye.setItemMeta(dyeMeta);
             s.getEquipment().setItemInMainHand(redDye);
 
@@ -178,14 +191,14 @@ public final class GanyuUltListener implements Listener {
         Particle.DustOptions ice = new Particle.DustOptions(org.bukkit.Color.fromRGB(120,180,255), 1.15f);
         ringTasks.put(id, Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!sphere.isValid() || sphere.isDead()) { cancel(ringTasks.remove(id)); return; }
-            renderRing(sphere.getWorld(), sphere.getLocation(), SPHERE_RADIUS_XZ, ice);
+            renderRing(sphere.getWorld(), sphere.getLocation(), sphereRadiusXz(), ice);
         }, 0L, 5L));
 
         // «ледяной дождь»: рандомные падения
         rainTasks.put(id, Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!sphere.isValid() || sphere.isDead()) { cancel(rainTasks.remove(id)); return; }
             spawnHitterRandom(sphere);
-        }, 0L, RAIN_INTERVAL_TICKS));
+        }, 0L, rainIntervalTicks()));
     }
 
     private void removeSphere(ArmorStand sphere) {
@@ -214,57 +227,71 @@ public final class GanyuUltListener implements Listener {
         Location c = sphere.getLocation();
 
         // равномерный по диску радиус 0..R
-        double r = SPHERE_RADIUS_XZ * Math.sqrt(Math.random());
-        // равномерный угол 0..2π
+        double r = sphereRadiusXz() * Math.sqrt(Math.random());
         double ang = Math.random() * Math.PI * 2;
 
         double x = c.getX() + Math.cos(ang) * r;
         double z = c.getZ() + Math.sin(ang) * r;
         Location spawn = new Location(w, x, c.getY(), z);
 
-        // спавним «груз» — ArmorStand с гравитацией
-        ArmorStand as = w.spawn(spawn, ArmorStand.class, s -> {
-            s.setInvisible(true);
-            s.setMarker(false);
-            s.setInvulnerable(true);
-            s.setGravity(true);
-            s.setCustomNameVisible(false);
+        String ownerStr = sphere.getPersistentDataContainer().get(KEY_OWNER, PersistentDataType.STRING);
 
-            ItemStack core = new ItemStack(Material.HEART_OF_THE_SEA);
-            ItemMeta cm = core.getItemMeta(); cm.setDisplayName("§bIceHitter"); core.setItemMeta(cm);
-            s.getEquipment().setItemInMainHand(core);
-
-            s.getPersistentDataContainer().set(KEY_HITTER, PersistentDataType.BYTE, (byte)1);
-            // пробуем подтянуть владельца из сферы
-            String owner = sphere.getPersistentDataContainer().get(KEY_OWNER, PersistentDataType.STRING);
-            if (owner != null) s.getPersistentDataContainer().set(KEY_OWNER, PersistentDataType.STRING, owner);
-        });
-
-        monitorHitter(as);
+        // НАСТОЯЩАЯ стрела, падающая вниз
+        Arrow arrow = w.spawnArrow(spawn, new Vector(0, -1, 0), (float) arrowSpeed(), 0f);
+        arrow.setGravity(true);
+        arrow.setCritical(false);
+        arrow.setPersistent(false);
+        arrow.setPickupStatus(AbstractArrow.PickupStatus.DISALLOWED); // нельзя поднять
+        arrow.setPierceLevel(127);                                     // проходит СКВОЗЬ игроков
+        arrow.setDamage(arrowDamage());                                // минимальный урон при попадании
+        var pdc = arrow.getPersistentDataContainer();
+        pdc.set(KEY_HITTER, PersistentDataType.BYTE, (byte) 1);
+        if (ownerStr != null) {
+            pdc.set(KEY_OWNER, PersistentDataType.STRING, ownerStr);
+            try {
+                var ent = Bukkit.getEntity(UUID.fromString(ownerStr));
+                if (ent instanceof Player op) arrow.setShooter(op);
+            } catch (IllegalArgumentException ignored) {}
+        }
     }
 
-    private void monitorHitter(ArmorStand hitter) {
-        UUID id = hitter.getUniqueId();
-        hitterMonitors.put(id, Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (!hitter.isValid() || hitter.isDead()) { cancel(hitterMonitors.remove(id)); return; }
+    /** Стрела воткнулась в БЛОК → через секунду ледяной взрыв. Попадания по сущностям игнорируем (стрела пробивная). */
+    @EventHandler(ignoreCancelled = false)
+    public void onArrowHit(ProjectileHitEvent e) {
+        if (!(e.getEntity() instanceof Arrow arrow)) return;
+        var pdc = arrow.getPersistentDataContainer();
+        if (!pdc.has(KEY_HITTER, PersistentDataType.BYTE)) return;
+        if (e.getHitBlock() == null) return;                       // попали в игрока (пробили) — летим дальше
+        if (pdc.has(KEY_ARMED, PersistentDataType.BYTE)) return;   // уже взводится
+        pdc.set(KEY_ARMED, PersistentDataType.BYTE, (byte) 1);
 
-            // приземлился? (на практике — или onGround, или снизу не воздух)
-            boolean onGround = hitter.isOnGround();
-            if (!onGround) {
-                Material below = hitter.getLocation().clone().add(0, -0.2, 0).getBlock().getType();
-                onGround = below.isSolid();
-            }
+        final Location impact = arrow.getLocation().clone().add(0, 0.1, 0);
+        final String ownerStr = pdc.get(KEY_OWNER, PersistentDataType.STRING);
 
-            if (onGround) {
-                Location impact = hitter.getLocation().clone().add(0, 0.1, 0);
-                doIceImpact(impact, hitter);
-                cancel(hitterMonitors.remove(id));
-                hitter.remove();
-            }
-        }, 0L, HITTER_CHECK_TICKS));
+        chargeArrowFx(arrow, impact);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            doIceImpact(impact, ownerStr);
+            if (arrow.isValid()) arrow.remove();
+        }, arrowFuseTicks());
     }
 
-    private void doIceImpact(Location loc, ArmorStand source) {
+    /** «Взвод» стрелы: копится иней ~1с до ледяного взрыва. */
+    private void chargeArrowFx(Arrow arrow, Location impact) {
+        World w = impact.getWorld();
+        try { w.playSound(impact, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.6f, 1.9f); } catch (Throwable ignored) {}
+        Particle.DustOptions ice = new Particle.DustOptions(org.bukkit.Color.fromRGB(120, 180, 255), 1.0f);
+        new BukkitRunnable() {
+            int t = 0;
+            @Override public void run() {
+                if (t++ >= arrowFuseTicks() || !arrow.isValid()) { cancel(); return; }
+                Location l = arrow.getLocation().clone().add(0, 0.2, 0);
+                w.spawnParticle(Particle.SNOWFLAKE, l, 4, 0.15, 0.15, 0.15, 0.01);
+                if (t % 4 == 0) w.spawnParticle(Particle.DUST, l, 2, 0.1, 0.1, 0.1, 0.0, ice);
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+    private void doIceImpact(Location loc, String ownerStr) {
         World w = loc.getWorld();
 
         // Визуал как у лука
@@ -283,7 +310,6 @@ public final class GanyuUltListener implements Listener {
 
         // Владелец для дружеского огня
         Player owner = null;
-        String ownerStr = source.getPersistentDataContainer().get(KEY_OWNER, PersistentDataType.STRING);
         if (ownerStr != null) {
             try {
                 UUID ou = UUID.fromString(ownerStr);
@@ -293,13 +319,15 @@ public final class GanyuUltListener implements Listener {
         }
 
         // АОЕ
-        for (var e : w.getNearbyEntities(loc, HITTER_IMPACT_RADIUS, HITTER_IMPACT_RADIUS, HITTER_IMPACT_RADIUS)) {
+        double impactRadius = hitterImpactRadius();
+        int freezeAdd = freezeAddTicks();
+        for (var e : w.getNearbyEntities(loc, impactRadius, impactRadius, impactRadius)) {
             if (!(e instanceof LivingEntity le) || le.isDead() || !le.isValid()) continue;
             if (owner != null && (le.getUniqueId().equals(owner.getUniqueId()) || isTeammate(owner, le))) continue;
 
             // Дебафы
-            le.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, SLOW_TICKS, SLOW_LEVEL, false, true, true));
-            le.setFreezeTicks(Math.min(le.getMaxFreezeTicks(), le.getFreezeTicks() + FREEZE_ADD_TICKS));
+            le.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slowTicks(), slowAmplifier(), false, true, true));
+            le.setFreezeTicks(Math.min(le.getMaxFreezeTicks(), le.getFreezeTicks() + freezeAdd));
 
             // БЫЛО:
             // double d = elemental.computeDamageWithReaction(
@@ -313,13 +341,15 @@ public final class GanyuUltListener implements Listener {
             // СТАЛО:
             double d = elemental.applyOnTotalDamage(
                     le,
-                    HITTER_DAMAGE,                          // уже суммарный «базовый» урон без реакции
+                    hitterDamage(),                         // уже суммарный «базовый» урон без реакции
                     ElementalReactions.Element.CRYO,
-                    /*newAuraTicks=*/FREEZE_ADD_TICKS,      // если реакции нет — повесим CRYO
+                    /*newAuraTicks=*/freezeAdd,             // если реакции нет — повесим CRYO
                     /*consumeOnReact=*/true                 // если реакция была — съедаем обе
             );
 
+            Vector kbBefore = le.getVelocity();
             if (owner != null) le.damage(d, owner); else le.damage(d);
+            try { le.setVelocity(kbBefore); } catch (Throwable ignored) {} // без отбрасывания от кастера
         }
     }
 

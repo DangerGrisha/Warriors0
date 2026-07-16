@@ -18,6 +18,8 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
+import org.money.money.util.ItemModels;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,8 +35,7 @@ public final class SaberDarkUltimateListener implements Listener {
     private final Set<UUID> firingPhase = ConcurrentHashMap.newKeySet();
 
     // Config
-    private static final int SOUL_COST = 4;
-    private static final long ULT_COOLDOWN_MS = 25_000L; // optional cooldown
+    private static int SOUL_COST() { return ClassRegistry.numInt("saberdark", "ultd", "soulCost", 4); }
     //private static final long CAST_LOCK_TICKS = 20L;     // 1 second charge
     private static final double MAX_RANGE = 48.0;
 
@@ -54,7 +55,7 @@ public final class SaberDarkUltimateListener implements Listener {
     private static final int SLASH_MAX_TICKS = 100;   // up to 5 sec (10-15 sec overall target)
 
     // Beam geometry / reach
-    private static final double BEAM_MAX_RANGE = 111;       // easy beam length tuning
+    private static double BEAM_MAX_RANGE() { return ClassRegistry.num("saberdark", "ultd", "beamRange", 111); }       // easy beam length tuning
     private static final double BEAM_HEIGHT_ABOVE_TARGET = 34.0;
     private static final double BEAM_BACK_DISTANCE = 14.0;
 
@@ -64,7 +65,7 @@ public final class SaberDarkUltimateListener implements Listener {
     // Beam destructive radii
     private static final double BEAM_CORE_RADIUS = 3;      // guaranteed destruction core
     private static final double BEAM_WAVE_RADIUS = 3.2;      // cinematic outer wave
-    private static final double BEAM_HIT_RADIUS = 3.0;
+    private static double BEAM_HIT_RADIUS() { return ClassRegistry.num("saberdark", "ultd", "beamHitRadius", 3.0); }
 
     // Final impact
     private static final double FINAL_BREAK_RADIUS = 5.0;
@@ -148,8 +149,8 @@ public final class SaberDarkUltimateListener implements Listener {
 
         int souls = excalibur.getSouls(exc);
 
-        if (souls < SOUL_COST) {
-            p.sendActionBar(Component.text("§cNeed " + SOUL_COST + " souls. §7(" + souls + "/" + SOUL_COST + ")"));
+        if (souls < SOUL_COST()) {
+            p.sendActionBar(Component.text("§cNeed " + SOUL_COST() + " souls. §7(" + souls + "/" + SOUL_COST() + ")"));
             return;
         }
 
@@ -160,10 +161,10 @@ public final class SaberDarkUltimateListener implements Listener {
         float lockedPitch = eye.getPitch();
 
         // Ray trace target using locked direction
-        Location target = findTargetPoint(p, eye, lockedDir, BEAM_MAX_RANGE);
+        Location target = findTargetPoint(p, eye, lockedDir, BEAM_MAX_RANGE());
 
         // Consume souls immediately (anti-abuse)
-        boolean consumed = consumeSoulsFromInventoryExcalibur(p, SOUL_COST);
+        boolean consumed = consumeSoulsFromInventoryExcalibur(p, SOUL_COST());
 
         if (!consumed) {
             p.sendActionBar(Component.text("§cFailed to consume souls."));
@@ -435,8 +436,8 @@ public final class SaberDarkUltimateListener implements Listener {
         // End point (clamped by tunable range)
         Location rawTarget = state.targetPoint.clone();
         double distFromEye = eye.distance(rawTarget);
-        final Location target = (distFromEye > BEAM_MAX_RANGE)
-                ? eye.clone().add(dir.clone().multiply(BEAM_MAX_RANGE))
+        final Location target = (distFromEye > BEAM_MAX_RANGE())
+                ? eye.clone().add(dir.clone().multiply(BEAM_MAX_RANGE()))
                 : rawTarget.clone();
 
         // Ground sweep direction (horizontal-ish)
@@ -451,17 +452,18 @@ public final class SaberDarkUltimateListener implements Listener {
         final Location sweepStart = target.clone().subtract(sweepDir.clone().multiply(BEAM_BACK_DISTANCE));
 
         // Total sweep length (tunable / safe)
-        final double sweepLength = Math.min(BEAM_MAX_RANGE, BEAM_BACK_DISTANCE + target.distance(sweepStart) + 10.0);
+        final double sweepLength = Math.min(BEAM_MAX_RANGE(), BEAM_BACK_DISTANCE + target.distance(sweepStart) + 10.0);
 
         // Dynamic pillar height based on beam length (longer beam = taller falling pillar)
-        final double normalizedLen = Math.max(0.0, Math.min(1.0, sweepLength / BEAM_MAX_RANGE));
+        final double normalizedLen = Math.max(0.0, Math.min(1.0, sweepLength / BEAM_MAX_RANGE()));
         final double dynamicPillarHeight = PILLAR_HEIGHT_MIN + (PILLAR_HEIGHT_MAX - PILLAR_HEIGHT_MIN) * normalizedLen;
 
         // Caster position snapshot for safe-zone checks
         final Location casterOrigin = caster.getLocation().clone();
 
         // Start cooldown when phase 4 begins
-        ultCooldownUntil.put(caster.getUniqueId(), System.currentTimeMillis() + ULT_COOLDOWN_MS);
+        long ultCooldownMs = ClassRegistry.millis("saberdark", "ultd", 25_000L);
+        ultCooldownUntil.put(caster.getUniqueId(), System.currentTimeMillis() + ultCooldownMs);
 
         new BukkitRunnable() {
             double traveled = 0.0;
@@ -517,7 +519,7 @@ public final class SaberDarkUltimateListener implements Listener {
                 spawnMinefieldDetonationEffects(w, impact, tick, PHASE4_BLAST_SIZE);
 
                 // 3) Damage + knockback (radius scales with blast size)
-                damageEntitiesInSlashBeam(caster, impact, (BEAM_HIT_RADIUS + 1.5) * PHASE4_BLAST_SIZE);
+                damageEntitiesInSlashBeam(caster, impact, (BEAM_HIT_RADIUS() + 1.5) * PHASE4_BLAST_SIZE);
 
                 // 4) Block destruction (radius scales with blast size, no drops)
                 destroyBlocksNoDrop(w, impact, (BEAM_CORE_RADIUS + 0.8) * PHASE4_BLAST_SIZE);
@@ -1047,7 +1049,7 @@ public final class SaberDarkUltimateListener implements Listener {
 
             // Landmine beam should hit hard and consistently even through invulnerability windows.
             le.setNoDamageTicks(0);
-            le.damage(12.0, caster);
+            le.damage(ClassRegistry.num("saberdark", "ultd", "beamDamage", 12.0), caster);
 
             Vector kb = e.getLocation().toVector().subtract(center.toVector());
             if (kb.lengthSquared() > 0.0001) {
@@ -1223,7 +1225,7 @@ public final class SaberDarkUltimateListener implements Listener {
     private CastState captureCurrentCastState(Player p) {
         Location eye = p.getEyeLocation().clone();
         Vector dir = eye.getDirection().normalize();
-        Location target = findTargetPoint(p, eye, dir, BEAM_MAX_RANGE);
+        Location target = findTargetPoint(p, eye, dir, BEAM_MAX_RANGE());
 
         return new CastState(
                 p.getUniqueId(),
@@ -1338,6 +1340,7 @@ public final class SaberDarkUltimateListener implements Listener {
         meta.setUnbreakable(true);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE);
 
+        ItemModels.apply(meta, "saber_dexcalibudrult");
         it.setItemMeta(meta);
         return it;
     }

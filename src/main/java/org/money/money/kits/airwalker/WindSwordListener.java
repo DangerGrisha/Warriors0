@@ -26,10 +26,10 @@ import java.util.*;
 public final class WindSwordListener implements Listener {
 
     // ====== Tuning ======
-    private static final double SLASH_RANGE = 15.0;      // blocks
+    private static double SLASH_RANGE() { return org.money.money.meta.ClassRegistry.num("airwalker", "windsword", "range", 15.0); }      // blocks
     private static final double STEP = 0.65;             // blocks per tick
-    private static final double HIT_RADIUS = 1.1;        // hit radius each step
-    private static final double DAMAGE = 12.0;            // 3 hearts
+    private static double HIT_RADIUS() { return org.money.money.meta.ClassRegistry.num("airwalker", "windsword", "hitRadius", 1.1); }        // hit radius each step
+    private static double DAMAGE() { return org.money.money.meta.ClassRegistry.num("airwalker", "windsword", "damage", 12.0); }            // 3 hearts
 
     private static final int PARTICLE_POINTS = 3;     // было 10 (в разы меньше)
     private static final int PARTICLE_EVERY_TICKS = 2; // частицы раз в 2 тика
@@ -180,7 +180,7 @@ public final class WindSwordListener implements Listener {
                 }
 
                 // hit detection
-                for (Entity ent : w.getNearbyEntities(pos, HIT_RADIUS, HIT_RADIUS, HIT_RADIUS)) {
+                for (Entity ent : w.getNearbyEntities(pos, HIT_RADIUS(), HIT_RADIUS(), HIT_RADIUS())) {
                     if (!(ent instanceof Player target)) continue;
                     if (target.getUniqueId().equals(caster.getUniqueId())) continue;
                     if (!target.isOnline() || target.isDead()) continue;
@@ -191,7 +191,7 @@ public final class WindSwordListener implements Listener {
 
                     hit.add(target.getUniqueId());
 
-                    target.damage(DAMAGE, caster);
+                    target.damage(DAMAGE(), caster);
                     w.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9f, 1.2f);
                     w.spawnParticle(Particle.CRIT, target.getLocation().add(0, 1.0, 0), 12, 0.25, 0.35, 0.25, 0.08);
 
@@ -201,7 +201,7 @@ public final class WindSwordListener implements Listener {
                 }
 
                 // max distance
-                if (traveled >= SLASH_RANGE) {
+                if (traveled >= SLASH_RANGE()) {
                     cancel();
                 }
             }

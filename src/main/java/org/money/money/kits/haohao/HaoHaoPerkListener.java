@@ -26,15 +26,15 @@ public final class HaoHaoPerkListener implements Listener {
 
     private static final String TAG_HAOHAO = "HaoHao";
 
-    private static final int KILL_STR_DURATION_TICKS = 20 * 10; // 10s
-    private static final int KILL_STR_AMPLIFIER = 2; // Strength III
+    private static int KILL_STR_DURATION_TICKS() { return org.money.money.meta.ClassRegistry.numInt("haohao", "mask", "killStrengthDurationTicks", 200); } // 10s
+    private static int KILL_STR_AMPLIFIER() { return org.money.money.meta.ClassRegistry.numInt("haohao", "mask", "killStrengthAmplifier", 2); } // Strength III
 
-    private static final int TOTEM_STR_DURATION_TICKS = 20 * 10; // 10s
-    private static final int TOTEM_STR_AMPLIFIER = 1; // Strength II
-    private static final double TOTEM_RADIUS = 10.0;
+    private static int TOTEM_STR_DURATION_TICKS() { return org.money.money.meta.ClassRegistry.numInt("haohao", "mask", "totemStrengthDurationTicks", 200); } // 10s
+    private static int TOTEM_STR_AMPLIFIER() { return org.money.money.meta.ClassRegistry.numInt("haohao", "mask", "totemStrengthAmplifier", 1); } // Strength II
+    private static double TOTEM_RADIUS() { return org.money.money.meta.ClassRegistry.num("haohao", "mask", "totemStrengthRadius", 10.0); }
 
-    private static final int DEATH_STR_DURATION_TICKS = 20 * 30; // 30s
-    private static final int DEATH_STR_AMPLIFIER = 1; // Strength II
+    private static int DEATH_STR_DURATION_TICKS() { return org.money.money.meta.ClassRegistry.numInt("haohao", "mask", "deathStrengthDurationTicks", 600); } // 30s
+    private static int DEATH_STR_AMPLIFIER() { return org.money.money.meta.ClassRegistry.numInt("haohao", "mask", "deathStrengthAmplifier", 1); } // Strength II
 
     private static final long LAST_HIT_WINDOW_MS = 4000L;
 
@@ -71,7 +71,7 @@ public final class HaoHaoPerkListener implements Listener {
         Player king = Bukkit.getPlayer(lastAttackerId);
         if (king == null || !king.isOnline() || king.isDead()) return;
 
-        giveStrengthToTeammatesInRadius(king, TOTEM_RADIUS, TOTEM_STR_AMPLIFIER, TOTEM_STR_DURATION_TICKS);
+        giveStrengthToTeammatesInRadius(king, TOTEM_RADIUS(), TOTEM_STR_AMPLIFIER(), TOTEM_STR_DURATION_TICKS());
         king.sendMessage("People got the strength");
     }
 
@@ -82,7 +82,7 @@ public final class HaoHaoPerkListener implements Listener {
         if (killer == null) return;
         if (!isKing(killer)) return;
 
-        giveStrengthToTeammates(killer, KILL_STR_AMPLIFIER, KILL_STR_DURATION_TICKS);
+        giveStrengthToTeammates(killer, KILL_STR_AMPLIFIER(), KILL_STR_DURATION_TICKS());
         killer.sendMessage("People got the strength");
     }
 
@@ -91,7 +91,7 @@ public final class HaoHaoPerkListener implements Listener {
         Player king = e.getEntity();
         if (!isKing(king)) return;
 
-        giveStrengthToTeammates(king, DEATH_STR_AMPLIFIER, DEATH_STR_DURATION_TICKS);
+        giveStrengthToTeammates(king, DEATH_STR_AMPLIFIER(), DEATH_STR_DURATION_TICKS());
         king.sendMessage("People got the strength");
     }
 

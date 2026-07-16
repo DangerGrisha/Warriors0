@@ -30,6 +30,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -65,15 +66,8 @@ public final class PhoenixDetonatorListener implements Listener, KitResettable {
     // Item marker
     private final org.bukkit.NamespacedKey KEY_PHOENIX;
 
-    // ===== Config (read once) =====
-    private final int cooldownTicks;
-    private final int durationTicks;
-    private final double finalExplosionRadius;
-    private final double blockBreakRadius;
-    private final double damage;
-    private final double knockback;
+    // ===== Config (read once; non-balance toggles only — balance numbers come from ClassRegistry at use time) =====
     private final boolean returnToOriginalLocation;
-    private final double selfKnockbackMultiplier;
 
     // ===== Active state =====
     private final Map<UUID, BukkitTask> activeTasks = new HashMap<>();
@@ -87,14 +81,12 @@ public final class PhoenixDetonatorListener implements Listener, KitResettable {
         this.manager = Objects.requireNonNull(manager);
         this.KEY_PHOENIX = new org.bukkit.NamespacedKey(plugin, "blastborn_phoenix");
 
-        this.cooldownTicks = Math.max(1, plugin.getConfig().getInt("classes.blastborn.ultimate.cooldownTicks", 2400));
-        this.durationTicks = Math.max(1, plugin.getConfig().getInt("classes.blastborn.ultimate.durationTicks", 200));
-        this.finalExplosionRadius = plugin.getConfig().getDouble("classes.blastborn.ultimate.finalExplosionRadius", 8.0);
-        this.blockBreakRadius = plugin.getConfig().getDouble("classes.blastborn.ultimate.blockBreakRadius", 5.0);
-        this.damage = plugin.getConfig().getDouble("classes.blastborn.ultimate.damage", 24.0);
-        this.knockback = plugin.getConfig().getDouble("classes.blastborn.ultimate.knockback", 3.5);
         this.returnToOriginalLocation = plugin.getConfig().getBoolean("classes.blastborn.ultimate.returnToOriginalLocation", true);
-        this.selfKnockbackMultiplier = plugin.getConfig().getDouble("classes.blastborn.selfKnockbackMultiplier", 2.25);
+    }
+
+    /** Charge-up duration (ticks), read at use time so /warriors reload applies. */
+    private static int durationTicks() {
+        return Math.max(1, ClassRegistry.numInt("blastborn", "ult", "durationTicks", 200));
     }
 
     /* ================== Item ================== */
@@ -238,6 +230,9 @@ public final class PhoenixDetonatorListener implements Listener, KitResettable {
                     return;
                 }
 
+                // Duration read each tick so /warriors reload applies without restart.
+                int durationTicks = durationTicks();
+
                 if (elapsed >= durationTicks) {
                     detonate(online);
                     endUlt(id, false);
@@ -279,6 +274,8 @@ public final class PhoenixDetonatorListener implements Listener, KitResettable {
         activeTasks.put(id, task);
 
         // Return the item ONLY after the full cooldown, and ONLY if still in-game.
+        // Cooldown read at use time so /warriors reload applies without restart.
+        final int cooldownTicks = Math.max(1, ClassRegistry.ticks("blastborn", "ult", 2400));
         BukkitTask cooldownTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             cooldownTasks.remove(id);
             Player online = Bukkit.getPlayer(id);
@@ -327,7 +324,7 @@ public final class PhoenixDetonatorListener implements Listener, KitResettable {
                 }
 
                 // Shrinking countdown ring on the ground.
-                double frac = Math.max(0.0, 1.0 - (elapsed / (double) durationTicks));
+                double frac = Math.max(0.0, 1.0 - (elapsed / (double) durationTicks()));
                 double r = 0.3 + 1.8 * frac;
                 drawGroundRing(originWorld, origin, r, silhouette);
 
@@ -355,6 +352,13 @@ public final class PhoenixDetonatorListener implements Listener, KitResettable {
     private void detonate(Player p) {
         Location loc = p.getLocation();
         World w = loc.getWorld();
+
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        final double finalExplosionRadius = ClassRegistry.num("blastborn", "ult", "finalExplosionRadius", 8.0);
+        final double blockBreakRadius = ClassRegistry.num("blastborn", "ult", "blockBreakRadius", 5.0);
+        final double damage = ClassRegistry.num("blastborn", "ult", "damage", 24.0);
+        final double knockback = ClassRegistry.num("blastborn", "ult", "knockback", 3.5);
+        final double selfKnockbackMultiplier = ClassRegistry.num("blastborn", "selfdestruction", "selfKnockbackMultiplier", 2.25);
 
         // Big blast at the player's CURRENT location — stronger blast + harder knockback,
         // with the caster flung the hardest of all.

@@ -23,6 +23,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
+import org.money.money.util.ItemModels;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -30,24 +31,23 @@ public final class NarutoRasenganListener implements Listener {
 
     /* =================== Константы =================== */
 
-    // КД возврата синего красителя после активации (real-time)
-    private static final long COOLDOWN_MS = 25_000L; // 1.5 мин
+    // баланс — читается из ClassRegistry при использовании (def = прежние значения)
 
     // Урон от высоты падения (добавляется к урону ивента удара)
-    private static final double BASE_DAMAGE   = 10.0;   // 2 сердца базой
-    private static final double PER_BLOCK_DMG = 1.2;   // +1 сердца за 2 блок
-    private static final double MAX_DAMAGE    = 70;  // хард-кап доп. урона
+    private static double baseDamage()     { return org.money.money.meta.ClassRegistry.num("naruto", "rasengan", "baseDamage", 10.0); }
+    private static double damagePerBlock() { return org.money.money.meta.ClassRegistry.num("naruto", "rasengan", "damagePerBlock", 1.2); }
+    private static double maxDamage()      { return org.money.money.meta.ClassRegistry.num("naruto", "rasengan", "maxDamage", 70.0); }
 
     // «Сила» удара (масштаб нокбэка) от высоты падения
-    private static final float BASE_POWER      = 2.0f;
-    private static final float POWER_PER_BLOCK = 0.2f;
-    private static final float MAX_POWER       = 20.0f;
+    private static float basePower()       { return (float) org.money.money.meta.ClassRegistry.num("naruto", "rasengan", "basePower", 2.0); }
+    private static float powerPerBlock()   { return (float) org.money.money.meta.ClassRegistry.num("naruto", "rasengan", "powerPerBlock", 0.2); }
+    private static float maxPower()        { return (float) org.money.money.meta.ClassRegistry.num("naruto", "rasengan", "maxPower", 20.0); }
 
     // «Ядро» должно исчезнуть через 15 секунд + обратный отсчёт за 3/2/1
-    private static final long CORE_TTL_TICKS = 20L * 15;
+    private static long coreTtlTicks()     { return org.money.money.meta.ClassRegistry.numInt("naruto", "rasengan", "coreTtlTicks", 300); }
     // Jump Boost III during Rasengan active window
-    private static final int RASENGAN_JUMP_TICKS = 20 * 15;
-    private static final int RASENGAN_JUMP_AMPLIFIER = 2; // III (zero-based)
+    private static int jumpTicks()         { return org.money.money.meta.ClassRegistry.numInt("naruto", "rasengan", "jumpDurationTicks", 300); }
+    private static int jumpAmplifier()     { return org.money.money.meta.ClassRegistry.numInt("naruto", "rasengan", "jumpAmplifier", 2); } // III (zero-based)
 
     /* =================== Поля =================== */
 
@@ -88,6 +88,7 @@ public final class NarutoRasenganListener implements Listener {
         ItemMeta im = it.getItemMeta();
         im.displayName(Component.text("Rasengan (charged)"));
         im.getPersistentDataContainer().set(KEY_RASENGAN_CORE, PersistentDataType.BYTE, (byte)1);
+        ItemModels.apply(im, "naruto_rasengan");
         it.setItemMeta(im);
         return it;
     }
@@ -130,18 +131,19 @@ public final class NarutoRasenganListener implements Listener {
         // Give mobility window while Rasengan core is active (15s).
         p.addPotionEffect(new PotionEffect(
                 PotionEffectType.JUMP_BOOST,
-                RASENGAN_JUMP_TICKS,
-                RASENGAN_JUMP_AMPLIFIER,
+                jumpTicks(),
+                jumpAmplifier(),
                 false, true, true
         ));
 
-        // возврат красителя через 1.5 мин (real-time)
-        long backAt = System.currentTimeMillis() + COOLDOWN_MS;
+        // возврат красителя (real-time)
+        long cooldownMs = org.money.money.meta.ClassRegistry.millis("naruto", "rasengan", 25_000L);
+        long backAt = System.currentTimeMillis() + cooldownMs;
         cooldownUntilMs.put(p.getUniqueId(), backAt);
         Bukkit.getAsyncScheduler().runDelayed(
                 plugin,
                 task -> Bukkit.getScheduler().runTask(plugin, () -> giveBackIfMissing(p.getUniqueId())),
-                COOLDOWN_MS, TimeUnit.MILLISECONDS
+                cooldownMs, TimeUnit.MILLISECONDS
         );
 
         // TTL ядра 10с + обратный отсчёт 3/2/1
@@ -192,14 +194,14 @@ public final class NarutoRasenganListener implements Listener {
 
     private double computeDamageFromFall(Player p) {
         double h = Math.max(0.0, p.getFallDistance()); // блоки падения с последнего onGround
-        double dmg = BASE_DAMAGE + PER_BLOCK_DMG * h;
-        return Math.min(dmg, MAX_DAMAGE);
+        double dmg = baseDamage() + damagePerBlock() * h;
+        return Math.min(dmg, maxDamage());
     }
 
     private float computePowerFromFall(Player p) {
         float h = (float) Math.max(0.0, p.getFallDistance());
-        float pow = BASE_POWER + POWER_PER_BLOCK * h;
-        return Math.min(pow, MAX_POWER);
+        float pow = basePower() + powerPerBlock() * h;
+        return Math.min(pow, maxPower());
     }
 
     private void doRasenganBlast(Player owner, Location center) {
@@ -288,7 +290,7 @@ public final class NarutoRasenganListener implements Listener {
         // убрать «ядро» из руки/инвентаря и зачистить таймеры TTL
         removeCoreIfPresent(playerId);
         cancelCoreTimers(playerId);
-        // возврат синего красителя происходит по плану (COOLDOWN_MS)
+        // возврат синего красителя происходит по плану (кд из ClassRegistry)
     }
 
     private void removeCoreIfPresent(UUID id) {
@@ -316,6 +318,8 @@ public final class NarutoRasenganListener implements Listener {
     private void scheduleCoreTTL(UUID ownerId) {
         cancelCoreTimers(ownerId);
 
+        long coreTtl = coreTtlTicks();
+
         List<Integer> ids = new ArrayList<>(4);
         coreTimerTasks.put(ownerId, ids);
 
@@ -324,27 +328,27 @@ public final class NarutoRasenganListener implements Listener {
             Player p = Bukkit.getPlayer(ownerId);
             if (p != null && p.isOnline() && hasCoreAnywhere(p))
                 p.sendMessage(Component.text("Rasengan исчезнет через 3с", NamedTextColor.YELLOW));
-        }, CORE_TTL_TICKS - 60).getTaskId());
+        }, coreTtl - 60).getTaskId());
 
         // 8с -> «через 2с»
         ids.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Player p = Bukkit.getPlayer(ownerId);
             if (p != null && p.isOnline() && hasCoreAnywhere(p))
                 p.sendMessage(Component.text("Rasengan исчезнет через 2с", NamedTextColor.YELLOW));
-        }, CORE_TTL_TICKS - 40).getTaskId());
+        }, coreTtl - 40).getTaskId());
 
         // 9с -> «через 1с»
         ids.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Player p = Bukkit.getPlayer(ownerId);
             if (p != null && p.isOnline() && hasCoreAnywhere(p))
                 p.sendMessage(Component.text("Rasengan исчезнет через 1с", NamedTextColor.YELLOW));
-        }, CORE_TTL_TICKS - 20).getTaskId());
+        }, coreTtl - 20).getTaskId());
 
         // 10с -> удалить ядро где бы оно ни лежало
         ids.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             removeCoreIfPresent(ownerId);
             cancelCoreTimers(ownerId);
-        }, CORE_TTL_TICKS).getTaskId());
+        }, coreTtl).getTaskId());
     }
 
     private boolean hasCoreAnywhere(Player p) {

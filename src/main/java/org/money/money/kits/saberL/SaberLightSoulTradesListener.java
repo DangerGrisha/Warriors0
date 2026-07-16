@@ -46,24 +46,25 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
     private static final int SLOT_REFRESH = 15;
     private static final int SLOT_CLOSE = 16;
 
-    // Costs
-    private static final int COST_SPEED_PERM = 3;
-    private static final int COST_JUMP_TEMP = 1;
-    private static final int COST_JUMP_PERM = 2;
+    // Costs (read from ClassRegistry at use time)
+    private static int COST_SPEED_PERM() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "speedPermSoulCost", 3); }
+    private static int COST_JUMP_TEMP() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "jumpTempSoulCost", 1); }
+    private static int COST_JUMP_PERM() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "jumpPermSoulCost", 2); }
 
     // Temp jump
-    private static final int TEMP_JUMP_SECONDS = 10;
+    private static int TEMP_JUMP_SECONDS() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "tempJumpDurationSeconds", 10); }
     // "Jump 10" in Minecraft effect terms means amplifier 9 (because amplifier is zero-based)
-    private static final int TEMP_JUMP_AMPLIFIER = 9;
+    private static int TEMP_JUMP_AMPLIFIER() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "tempJumpAmplifier", 9); }
 
     // Permanent buff level caps (optional safety; raise/remove if you want)
-    private static final int MAX_PERM_SPEED_LEVEL = 3; // Speed I..III
-    private static final int MAX_PERM_JUMP_LEVEL = 3;  // Jump I..III
+    private static int MAX_PERM_SPEED_LEVEL() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "maxPermSpeedLevel", 3); } // Speed I..III
+    private static int MAX_PERM_JUMP_LEVEL() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "maxPermJumpLevel", 3); }  // Jump I..III
 
     // Per-player match state
     private final Map<UUID, Integer> permanentSpeedLevel = new HashMap<>();
     private final Map<UUID, Integer> permanentJumpLevel = new HashMap<>();
     private final Map<UUID, Integer> totemsBought = new HashMap<>();
+    private final Set<UUID> tempJumpCredit = new HashSet<>(); // полцены temp-jump: оплаченный даёт ещё один бесплатный
 
     public SaberLightSoulTradesListener(JavaPlugin plugin, SaberLightExcaliburSoulHook soulHook) {
         this.plugin = plugin;
@@ -205,10 +206,10 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
                 "§bRoyal Haste §7(+1 Speed)",
                 List.of(
                         "§7Permanent for the match",
-                        "§7Cost: §e" + COST_SPEED_PERM + " soul(s)",
+                        "§7Cost: §e" + COST_SPEED_PERM() + " soul(s)",
                         "§7Current: §b" + roman(speedLvl),
-                        "§7Max: §b" + roman(MAX_PERM_SPEED_LEVEL),
-                        canAffordLine(souls, COST_SPEED_PERM)
+                        "§7Max: §b" + roman(MAX_PERM_SPEED_LEVEL()),
+                        canAffordLine(souls, COST_SPEED_PERM())
                 )
         ));
 
@@ -217,10 +218,10 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
                 Material.RABBIT_FOOT,
                 "§eSky Burst §7(Jump X / 10s)",
                 List.of(
-                        "§7Jump Boost X for §e" + TEMP_JUMP_SECONDS + "s",
-                        "§7Cost: §e" + COST_JUMP_TEMP + " soul(s)",
+                        "§7Jump Boost X for §e" + TEMP_JUMP_SECONDS() + "s",
+                        "§7Cost: §e" + COST_JUMP_TEMP() + " soul(s)",
                         "§8Great for engage / escape",
-                        canAffordLine(souls, COST_JUMP_TEMP)
+                        canAffordLine(souls, COST_JUMP_TEMP())
                 )
         ));
 
@@ -230,10 +231,10 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
                 "§aSkybound Oath §7(+1 Jump)",
                 List.of(
                         "§7Permanent for the match",
-                        "§7Cost: §e" + COST_JUMP_PERM + " soul(s)",
+                        "§7Cost: §e" + COST_JUMP_PERM() + " soul(s)",
                         "§7Current: §a" + roman(jumpLvl),
-                        "§7Max: §a" + roman(MAX_PERM_JUMP_LEVEL),
-                        canAffordLine(souls, COST_JUMP_PERM)
+                        "§7Max: §a" + roman(MAX_PERM_JUMP_LEVEL()),
+                        canAffordLine(souls, COST_JUMP_PERM())
                 )
         ));
 
@@ -280,15 +281,15 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
         UUID id = p.getUniqueId();
         int current = permanentSpeedLevel.getOrDefault(id, 0);
 
-        if (current >= MAX_PERM_SPEED_LEVEL) {
-            p.sendMessage("§cPermanent Speed is already at max (§b" + roman(MAX_PERM_SPEED_LEVEL) + "§c).");
+        if (current >= MAX_PERM_SPEED_LEVEL()) {
+            p.sendMessage("§cPermanent Speed is already at max (§b" + roman(MAX_PERM_SPEED_LEVEL()) + "§c).");
             p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7f, 0.9f);
             openSoulTradesMenu(p);
             return;
         }
 
-        if (!trySpendSouls(p, COST_SPEED_PERM)) {
-            p.sendMessage("§cNot enough souls for Permanent Speed. Need §e" + COST_SPEED_PERM + "§c.");
+        if (!trySpendSouls(p, COST_SPEED_PERM())) {
+            p.sendMessage("§cNot enough souls for Permanent Speed. Need §e" + COST_SPEED_PERM() + "§c.");
             p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7f, 0.9f);
             openSoulTradesMenu(p);
             return;
@@ -304,24 +305,30 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
     }
 
     private void handleBuyTempJump(Player p) {
-        if (!trySpendSouls(p, COST_JUMP_TEMP)) {
-            p.sendMessage("§cNot enough souls for Jump Burst. Need §e" + COST_JUMP_TEMP + "§c.");
-            p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7f, 0.9f);
-            openSoulTradesMenu(p);
-            return;
+        UUID id = p.getUniqueId();
+        // Полцены: 1 душа = 2 прыжка (эффективно 0.5 души за прыжок).
+        boolean free = tempJumpCredit.remove(id);
+        if (!free) {
+            if (!trySpendSouls(p, COST_JUMP_TEMP())) {
+                p.sendMessage("§cNot enough souls for Jump Burst. Need §e" + COST_JUMP_TEMP() + "§c.");
+                p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7f, 0.9f);
+                openSoulTradesMenu(p);
+                return;
+            }
+            tempJumpCredit.add(id); // оплатил 1 душу → следующий прыжок бесплатный
         }
 
         // Add temporary Jump X (10s). Ambient/particles hidden for cleaner look.
         p.addPotionEffect(new PotionEffect(
                 PotionEffectType.JUMP_BOOST,
-                TEMP_JUMP_SECONDS * 20,
-                TEMP_JUMP_AMPLIFIER,
+                TEMP_JUMP_SECONDS() * 20,
+                TEMP_JUMP_AMPLIFIER(),
                 false,
                 false,
                 true
         ));
 
-        p.sendMessage("§6Soul Contract: §fJump Burst activated (§e10s§f).");
+        p.sendMessage("§6Soul Contract: §fJump Burst activated (§e10s§f)." + (free ? " §8(бесплатно ½)" : ""));
         p.playSound(p.getLocation(), Sound.ENTITY_BREEZE_JUMP, 0.8f, 1.15f);
         openSoulTradesMenu(p);
     }
@@ -330,15 +337,15 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
         UUID id = p.getUniqueId();
         int current = permanentJumpLevel.getOrDefault(id, 0);
 
-        if (current >= MAX_PERM_JUMP_LEVEL) {
-            p.sendMessage("§cPermanent Jump is already at max (§a" + roman(MAX_PERM_JUMP_LEVEL) + "§c).");
+        if (current >= MAX_PERM_JUMP_LEVEL()) {
+            p.sendMessage("§cPermanent Jump is already at max (§a" + roman(MAX_PERM_JUMP_LEVEL()) + "§c).");
             p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7f, 0.9f);
             openSoulTradesMenu(p);
             return;
         }
 
-        if (!trySpendSouls(p, COST_JUMP_PERM)) {
-            p.sendMessage("§cNot enough souls for Permanent Jump. Need §e" + COST_JUMP_PERM + "§c.");
+        if (!trySpendSouls(p, COST_JUMP_PERM())) {
+            p.sendMessage("§cNot enough souls for Permanent Jump. Need §e" + COST_JUMP_PERM() + "§c.");
             p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7f, 0.9f);
             openSoulTradesMenu(p);
             return;
@@ -421,7 +428,9 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
     // =========================================================
     private int getNextTotemCost(Player p) {
         int bought = totemsBought.getOrDefault(p.getUniqueId(), 0);
-        return bought <= 0 ? 3 : 4;
+        return bought <= 0
+                ? org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "totemFirstSoulCost", 3)
+                : org.money.money.meta.ClassRegistry.numInt("saberlight", "soultrades", "totemNextSoulCost", 4);
     }
 
     // =========================================================
@@ -478,6 +487,7 @@ public class SaberLightSoulTradesListener implements Listener, KitResettable {
         permanentSpeedLevel.remove(id);
         permanentJumpLevel.remove(id);
         totemsBought.remove(id);
+        tempJumpCredit.remove(id);
 
         // Remove only if you want to fully clean buffs on reset:
         p.removePotionEffect(PotionEffectType.SPEED);

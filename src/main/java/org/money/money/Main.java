@@ -19,6 +19,7 @@ import org.money.money.kits.dio.VampireListener;
 import org.money.money.kits.fukuko.FukukoPistolListener;
 import org.money.money.kits.fukuko.FukukoMortiraListener;
 import org.money.money.kits.fukuko.FukukoBombZoneListener;
+import org.money.money.kits.fukuko.FukukoShockGrenadeListener;
 import org.money.money.kits.ladynagan.LadyCooldownManager;
 import org.money.money.kits.ladynagan.LadyNaganSniperListener;
 import org.money.money.kits.ladynagan.LadyNaganFlyListener;
@@ -39,6 +40,7 @@ import org.money.money.kits.ganyu.give.KitGiveCommand;
 import org.money.money.kits.ganyu.listeners.GanyuBowListener;
 import org.money.money.kits.ganyu.listeners.GanyuBudListener;
 import org.money.money.kits.ganyu.listeners.GanyuUltListener;
+import org.money.money.kits.ganyu.listeners.GanyuMeteorListener;
 import org.money.money.kits.haohao.SwordShield;
 import org.money.money.kits.haohao.MaskAbility;
 import org.money.money.kits.haohao.HaoHaoPerkListener;
@@ -68,6 +70,13 @@ import org.money.money.kits.blastborn.BlastGlovesListener;
 import org.money.money.kits.blastborn.ImpactGrenadeListener;
 import org.money.money.kits.blastborn.PhoenixDetonatorListener;
 import org.money.money.kits.blastborn.SweatMachineGunListener;
+import org.money.money.kits.bluerose.BlueRoseGuardianManager;
+import org.money.money.kits.bluerose.BlueRoseWardListener;
+import org.money.money.kits.bluerose.RosebindListener;
+import org.money.money.kits.bluerose.PetalStepListener;
+import org.money.money.kits.bluerose.HeritageBloomListener;
+import org.money.money.kits.bluerose.GardenOfFirstRoseListener;
+import org.money.money.kits.bluerose.SoumetsuStormListener;
 import org.bukkit.entity.Player;
 
 public final class Main extends JavaPlugin {
@@ -82,11 +91,13 @@ public final class Main extends JavaPlugin {
     private PhoenixDetonatorListener blastPhoenix;
     private SweatMachineGunListener blastGun;
     private IshigavaCloneListener ishigavaClones;
+    private BlueRoseGuardianManager blueRose;
 
     @Override
     public void onEnable() {
 
         saveDefaultConfig();
+        org.money.money.meta.ClassRegistry.init(this);
         org.money.money.session.KitSession.configureLobbyWorlds(getConfig().getStringList("lobby-worlds"));
 
         elemental = new ElementalReactions(this);
@@ -95,6 +106,7 @@ public final class Main extends JavaPlugin {
         var bow  = new GanyuBowListener(this,elemental);
         var bud  = new GanyuBudListener(this,elemental);
         var ult  = new GanyuUltListener(this,elemental);
+        var meteor = new GanyuMeteorListener(this);
         var homa = new HuTaoInvisListener(this);
         var pyro = new HuTaoPyroListener(this,elemental);
         var boom = new HuTaoBoomListener(this, elemental);
@@ -128,6 +140,7 @@ public final class Main extends JavaPlugin {
         var fukukoPistol   = new FukukoPistolListener(this);
         var fukukoMortira  = new FukukoMortiraListener(this);
         var fukukoBombZone = new FukukoBombZoneListener(this);
+        var fukukoShock    = new FukukoShockGrenadeListener(this);
         var ladyCooldowns  = new LadyCooldownManager(this);
         this.ladySniper    = new LadyNaganSniperListener(this, ladyCooldowns);
         var ladySniper     = this.ladySniper;
@@ -163,10 +176,20 @@ public final class Main extends JavaPlugin {
         this.blastPhoenix = blastPhx;
         this.blastGun = blastGun;
 
+        var brgMgr        = new BlueRoseGuardianManager(this);
+        var brgWard       = new BlueRoseWardListener(brgMgr);
+        var brgRosebind   = new RosebindListener(brgMgr);
+        var brgPetalStep  = new PetalStepListener(brgMgr);
+        var brgHeritage   = new HeritageBloomListener(brgMgr);
+        var brgGarden     = new GardenOfFirstRoseListener(brgMgr);
+        var brgStorm      = new SoumetsuStormListener(brgMgr);
+        this.blueRose = brgMgr;
+
 
         getServer().getPluginManager().registerEvents(bow,  this);
         getServer().getPluginManager().registerEvents(bud,  this);
         getServer().getPluginManager().registerEvents(ult,  this);
+        getServer().getPluginManager().registerEvents(meteor, this);
         getServer().getPluginManager().registerEvents(homa, this);
         getServer().getPluginManager().registerEvents(pyro, this);
         getServer().getPluginManager().registerEvents(boom, this);
@@ -198,6 +221,7 @@ public final class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(fukukoPistol,   this);
         getServer().getPluginManager().registerEvents(fukukoMortira,  this);
         getServer().getPluginManager().registerEvents(fukukoBombZone, this);
+        getServer().getPluginManager().registerEvents(fukukoShock,    this);
         getServer().getPluginManager().registerEvents(ladySniper,    this);
         getServer().getPluginManager().registerEvents(ladyFly,       this);
         getServer().getPluginManager().registerEvents(ladyTraps,     this);
@@ -222,17 +246,24 @@ public final class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(blastGren,    this);
         getServer().getPluginManager().registerEvents(blastPhx,     this);
         getServer().getPluginManager().registerEvents(blastGun,     this);
+        getServer().getPluginManager().registerEvents(brgMgr,       this);
+        getServer().getPluginManager().registerEvents(brgWard,      this);
+        getServer().getPluginManager().registerEvents(brgRosebind,  this);
+        getServer().getPluginManager().registerEvents(brgPetalStep, this);
+        getServer().getPluginManager().registerEvents(brgHeritage,  this);
+        getServer().getPluginManager().registerEvents(brgGarden,    this);
+        getServer().getPluginManager().registerEvents(brgStorm,     this);
 
-        var kit = new KitGiveCommand(this, bud, ult, homa, pyro, boom, timestop, vampire, glove, gravity, post,
+        var kit = new KitGiveCommand(this, bud, ult, meteor, homa, pyro, boom, timestop, vampire, glove, gravity, post,
                 levitationMark, rassengan, randomtp, clones, grill, garden, hungry, wind, windult, windsword, windinvis,
                 haoh, mask, opera, operaAura, saberlightexcalibur, saberlightrealese, saberdarkexcalibur, saberdarkrelease,
-                fukukoPistol, fukukoMortira, fukukoBombZone,
+                fukukoPistol, fukukoMortira, fukukoBombZone, fukukoShock,
                 ladySniper, ladyFly, ladyTraps, ladyExplosion,
                 saskeSword, saskeShuriken, saskeBody, saskeChidori, saskeAttraction,
                 ishiShield, ishiBridges, ishiWall, ishiAura, ishiKunai,
                 twRun, twSlash, twMomentum, twUlt,
                 blastMgr, blastGloves, blastGren, blastPhx, blastGun,
-                ishiClones);
+                ishiClones, brgMgr);
         getCommand("kitgive").setExecutor(kit);
         getCommand("kitgive").setTabCompleter(kit);
 
@@ -298,6 +329,7 @@ public final class Main extends JavaPlugin {
         resettables.add(blastPhx);
         resettables.add(blastGun);
         resettables.add(ishiClones);
+        resettables.add(brgMgr);
         var sessionManager = new org.money.money.session.SessionManager(resettables);
         getServer().getPluginManager().registerEvents(sessionManager, this);
         getCommand("warriors").setExecutor(sessionManager);
@@ -315,6 +347,7 @@ public final class Main extends JavaPlugin {
         if (blastPhoenix != null) blastPhoenix.shutdown();
         if (blastGun != null) blastGun.stop();
         if (ishigavaClones != null) ishigavaClones.shutdown();
+        if (blueRose != null) blueRose.stop();
 
     }
 

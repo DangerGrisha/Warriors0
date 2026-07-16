@@ -21,6 +21,8 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.money.money.meta.ClassRegistry;
+import org.money.money.session.KitSession;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -37,13 +39,12 @@ import java.util.concurrent.TimeUnit;
  */
 public final class UrarakaGravityListener implements Listener {
 
-    private static final long WINDUP_TICKS       = 20L * 3;   // 3 сек разгон
-    private static final long ARMED_WINDOW_TICKS = 20L * 10;  // 10 сек окно
+    private static long WINDUP_TICKS() { return ClassRegistry.numInt("uraraka", "gravity", "windupTicks", 60); }   // 3 сек разгон
+    private static long ARMED_WINDOW_TICKS() { return ClassRegistry.numInt("uraraka", "gravity", "armedWindowTicks", 200); }  // 10 сек окно
     private static final long SOUND_PERIOD       = 10L;       // раз в 0.5с во время разгона
-    private static final int  SLOW_LEVEL         = 2;         // Slowness III (0=I)
-    private static final int  LEVITATION_TICKS   = 20 * 8;    // 8 сек
-    private static final int  LEVITATION_LVL     = 0;         // Levitation I
-    private static final long COOLDOWN_MS        = 120_000L;  // 2 минуты
+    private static int SLOW_LEVEL() { return ClassRegistry.numInt("uraraka", "gravity", "windupSlowAmplifier", 2); }         // Slowness III (0=I)
+    private static int LEVITATION_TICKS() { return ClassRegistry.numInt("uraraka", "gravity", "levitationDurationTicks", 160); }    // 8 сек
+    private static int LEVITATION_LVL() { return ClassRegistry.numInt("uraraka", "gravity", "levitationAmplifier", 0); }         // Levitation I
 
     private final Plugin plugin;
 
@@ -126,7 +127,7 @@ public final class UrarakaGravityListener implements Listener {
             if (!playerHas(p, KEY_CANCEL)) giveToHandOrInv(p, makeCancelDye());
 
             // Slowness на 3 сек и тревожный звук
-            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, (int)WINDUP_TICKS, SLOW_LEVEL, false, false, false));
+            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, (int)WINDUP_TICKS(), SLOW_LEVEL(), false, false, false));
             startWindupSound(p);
 
             // разгон => окно 10с
@@ -143,10 +144,10 @@ public final class UrarakaGravityListener implements Listener {
                     if (armed.contains(id)) {
                         finishAndCooldown(id, FinishReason.TIMEOUT);
                     }
-                }, ARMED_WINDOW_TICKS);
+                }, ARMED_WINDOW_TICKS());
                 armedWindowTask.put(id, wnd);
 
-            }, WINDUP_TICKS);
+            }, WINDUP_TICKS());
             windupTask.put(id, t);
             return;
         }
@@ -182,7 +183,7 @@ public final class UrarakaGravityListener implements Listener {
 
     private void applyLevitation(UUID ownerId, LivingEntity target) {
         liftedByOwner.computeIfAbsent(ownerId, k -> new HashSet<>()).add(target.getUniqueId());
-        target.addPotionEffect(new PotionEffect(PotionEffectType.LEVITATION, LEVITATION_TICKS, LEVITATION_LVL, false, true, true));
+        target.addPotionEffect(new PotionEffect(PotionEffectType.LEVITATION, LEVITATION_TICKS(), LEVITATION_LVL(), false, true, true));
         try {
             var l = target.getLocation().add(0, 0.6, 0);
             target.getWorld().spawnParticle(Particle.END_ROD, l, 10, 0.3, 0.4, 0.3, 0.01);
@@ -208,6 +209,14 @@ public final class UrarakaGravityListener implements Listener {
     /** Полное завершение режима и запуск КД (2 мин) с последующим возвратом предмета. */
     /** Полное завершение режима и запуск КД (2 мин). */
     private void finishAndCooldown(UUID ownerId, FinishReason why) {
+        // Финишим ТОЛЬКО того, кто реально сейчас пользуется gravity. Иначе смерть/выход
+        // ЛЮБОГО игрока (onDeath/onQuit висят на всех) планировали бы возврат «gravity»-пера —
+        // и предмет «расходился» по всем игрокам, даже без класса Uraraka.
+        boolean engaged = windingUp.contains(ownerId) || armed.contains(ownerId)
+                || windupTask.containsKey(ownerId) || armedWindowTask.containsKey(ownerId)
+                || soundTask.containsKey(ownerId) || liftedByOwner.containsKey(ownerId);
+        if (!engaged) return;
+
         // остановить таймеры
         BukkitTask t = windupTask.remove(ownerId); if (t != null) t.cancel();
         stopSound(ownerId);
@@ -240,19 +249,21 @@ public final class UrarakaGravityListener implements Listener {
             }
         }
 
-        long backAt = System.currentTimeMillis() + COOLDOWN_MS;
+        long cooldownMs = ClassRegistry.millis("uraraka", "gravity", 120_000L);
+        long backAt = System.currentTimeMillis() + cooldownMs;
         cooldownUntilMs.put(ownerId, backAt);
 
         Bukkit.getAsyncScheduler().runDelayed(plugin, task ->
                         Bukkit.getScheduler().runTask(plugin, () -> {
                             Player pl = Bukkit.getPlayer(ownerId);
-                            if (pl != null && pl.isOnline() && !playerHas(pl, KEY_GRAVITY)) {
+                            // isInGame — предмет не должен «всплыть» в лобби / после матча
+                            if (pl != null && pl.isOnline() && KitSession.isInGame(pl) && !playerHas(pl, KEY_GRAVITY)) {
                                 giveToHandOrInv(pl, makeGravityDye());
                                 pl.playSound(pl.getLocation(), Sound.UI_TOAST_IN, 0.7f, 1.2f);
                                 pl.sendMessage(Component.text("Gravity восстановлена.", NamedTextColor.GREEN));
                             }
                         })
-                , COOLDOWN_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+                , cooldownMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
 

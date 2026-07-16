@@ -20,6 +20,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -47,19 +48,8 @@ public final class BlastbornManager implements Listener, KitResettable {
 
     private final Plugin plugin;
 
-    // ===== Config (read once) =====
-    private final int max;
-    private final int decayIntervalTicks;
-    private final int decayAmount;
-    private final int gainPerGloveExplosion;
-    private final int overloadDelayTicks;
-    private final double overloadExplosionRadius;
-    private final double overloadBlockBreakRadius;
-    private final double overloadDamage;
-    private final double overloadKnockback;
-    private final double selfKnockbackMultiplier;
+    // ===== Config (read once; non-balance toggles only — balance numbers come from ClassRegistry at use time) =====
     private final boolean overloadKillsSelf;
-    private final double overloadTotemDamageMultiplier;
 
     // ===== Per-player resource state =====
     private final Map<UUID, Integer> points = new HashMap<>();
@@ -73,28 +63,33 @@ public final class BlastbornManager implements Listener, KitResettable {
     public BlastbornManager(Plugin plugin) {
         this.plugin = Objects.requireNonNull(plugin);
 
-        this.max = Math.max(1, plugin.getConfig().getInt("classes.blastborn.selfDestruction.max", 100));
-        this.decayIntervalTicks = Math.max(1, plugin.getConfig().getInt("classes.blastborn.selfDestruction.decayIntervalTicks", 10));
-        this.decayAmount = Math.max(0, plugin.getConfig().getInt("classes.blastborn.selfDestruction.decayAmount", 1));
-        this.gainPerGloveExplosion = plugin.getConfig().getInt("classes.blastborn.selfDestruction.gainPerGloveExplosion", 10);
-        this.overloadDelayTicks = Math.max(1, plugin.getConfig().getInt("classes.blastborn.selfDestruction.overloadDelayTicks", 20));
-        this.overloadExplosionRadius = plugin.getConfig().getDouble("classes.blastborn.selfDestruction.overloadExplosionRadius", 5.5);
-        this.overloadBlockBreakRadius = plugin.getConfig().getDouble("classes.blastborn.selfDestruction.overloadBlockBreakRadius", 4.0);
-        this.overloadDamage = plugin.getConfig().getDouble("classes.blastborn.selfDestruction.overloadDamage", 28.0);
-        this.overloadKnockback = plugin.getConfig().getDouble("classes.blastborn.selfDestruction.overloadKnockback", 2.0);
-        this.selfKnockbackMultiplier = plugin.getConfig().getDouble("classes.blastborn.selfKnockbackMultiplier", 2.25);
         this.overloadKillsSelf = plugin.getConfig().getBoolean("classes.blastborn.selfDestruction.overloadKillsSelf", true);
-        this.overloadTotemDamageMultiplier = plugin.getConfig().getDouble("classes.blastborn.selfDestruction.overloadTotemDamageMultiplier", 0.5);
 
         startDecayTask();
+    }
+
+    /* ================== Registry reads (use-time, hot-reloadable) ================== */
+
+    private static int maxPoints() {
+        return Math.max(1, ClassRegistry.numInt("blastborn", "selfdestruction", "max", 100));
     }
 
     /* ================== Global decay ================== */
 
     private void startDecayTask() {
+        // Runs every tick and applies the decay every decayIntervalTicks — the interval and the
+        // amount are read from the registry each pass so /warriors reload applies without restart.
         this.decayTask = new BukkitRunnable() {
+            int sinceDecay = 0;
+
             @Override
             public void run() {
+                int interval = Math.max(1, ClassRegistry.numInt("blastborn", "selfdestruction", "decayIntervalTicks", 10));
+                sinceDecay++;
+                if (sinceDecay < interval) return;
+                sinceDecay = 0;
+
+                int decayAmount = Math.max(0, ClassRegistry.numInt("blastborn", "selfdestruction", "decayAmount", 1));
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     if (!p.getScoreboardTags().contains(TAG_BLASTBORN)) continue;
                     // Only decay / touch the bar while actually in a game; lobby is left alone.
@@ -111,7 +106,7 @@ public final class BlastbornManager implements Listener, KitResettable {
                     }
                 }
             }
-        }.runTaskTimer(plugin, decayIntervalTicks, decayIntervalTicks);
+        }.runTaskTimer(plugin, 1L, 1L);
     }
 
     /* ================== XP bar ================== */
@@ -119,7 +114,7 @@ public final class BlastbornManager implements Listener, KitResettable {
     private void updateXpBar(Player p) {
         int cur = points.getOrDefault(p.getUniqueId(), 0);
         p.setLevel(cur);
-        p.setExp(Math.min(0.999f, cur / (float) max));
+        p.setExp(Math.min(0.999f, cur / (float) maxPoints()));
     }
 
     private void restoreXpBar(Player p) {
@@ -144,6 +139,7 @@ public final class BlastbornManager implements Listener, KitResettable {
         // Only ever touch a real Blastborn's meter/XP bar — never hijack a non-Blastborn's
         // vanilla XP bar (e.g. someone holding a stray gloves item after a drop/trade).
         if (p == null || amount == 0 || !isBlastborn(p)) return;
+        int max = maxPoints();
         UUID id = p.getUniqueId();
         int cur = points.getOrDefault(id, 0);
         int next = Math.max(0, Math.min(max, cur + amount));
@@ -159,7 +155,7 @@ public final class BlastbornManager implements Listener, KitResettable {
     public void addGloveGain(Player p) {
         if (p == null) return;
         if (isUltActive(p)) return; // glove blasts don't build the meter during the ult
-        addPoints(p, gainPerGloveExplosion);
+        addPoints(p, ClassRegistry.numInt("blastborn", "selfdestruction", "gainPerGloveExplosion", 10));
     }
 
     public int getPoints(Player p) {
@@ -222,6 +218,7 @@ public final class BlastbornManager implements Listener, KitResettable {
                     return;
                 }
 
+                int overloadDelayTicks = Math.max(1, ClassRegistry.numInt("blastborn", "selfdestruction", "overloadDelayTicks", 20));
                 if (elapsed >= overloadDelayTicks) {
                     detonate(online);
                     overloadTasks.remove(id);
@@ -251,6 +248,14 @@ public final class BlastbornManager implements Listener, KitResettable {
     private void detonate(Player p) {
         Location loc = p.getLocation();
         UUID id = p.getUniqueId();
+
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        final double overloadExplosionRadius = ClassRegistry.num("blastborn", "selfdestruction", "overloadExplosionRadius", 5.5);
+        final double overloadBlockBreakRadius = ClassRegistry.num("blastborn", "selfdestruction", "overloadBlockBreakRadius", 4.0);
+        final double overloadDamage = ClassRegistry.num("blastborn", "selfdestruction", "overloadDamage", 28.0);
+        final double overloadKnockback = ClassRegistry.num("blastborn", "selfdestruction", "overloadKnockback", 2.0);
+        final double selfKnockbackMultiplier = ClassRegistry.num("blastborn", "selfdestruction", "selfKnockbackMultiplier", 2.25);
+        final double overloadTotemDamageMultiplier = ClassRegistry.num("blastborn", "selfdestruction", "overloadTotemDamageMultiplier", 0.5);
 
         // Holding a Totem of Undying? It soaks the self-destruct: the totem pops (vanilla, when the
         // lethal hit below lands) and the blast lands SOFTER on everyone else.

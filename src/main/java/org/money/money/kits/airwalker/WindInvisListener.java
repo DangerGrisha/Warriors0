@@ -23,7 +23,7 @@ import java.util.*;
 public final class WindInvisListener implements Listener {
 
     // ===== Settings =====
-    private static final int INVIS_TICKS = 30 * 20;           // 30 seconds
+    private static int INVIS_TICKS() { return org.money.money.meta.ClassRegistry.numInt("airwalker", "invis", "invisDurationTicks", 600); }           // 30 seconds
     private static final long RETURN_AFTER_TICKS = 3L * 60L * 20L; // 3 minutes
 
     private final Plugin plugin;
@@ -138,7 +138,7 @@ public final class WindInvisListener implements Listener {
         waitingReturn.add(id);
 
         // Give invis
-        p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, INVIS_TICKS, 0, false, false, false));
+        p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, INVIS_TICKS(), 0, false, false, false));
         p.playSound(p.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 0.8f, 1.6f);
         p.sendMessage(Component.text("You became wind (Invisible) for 30s.", NamedTextColor.AQUA));
 

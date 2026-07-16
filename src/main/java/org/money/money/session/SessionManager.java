@@ -77,8 +77,18 @@ public final class SessionManager implements Listener, CommandExecutor, TabCompl
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length >= 1 && args[0].equalsIgnoreCase("reload")) {
+            var plugin = org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass());
+            boolean ok = org.money.money.meta.ClassRegistry.reload(plugin);
+            sender.sendMessage(ok
+                    ? "§aclasses.json перезагружен — новые кулдауны уже действуют."
+                    : "§cНе удалось перечитать classes.json — смотри консоль.");
+            return true;
+        }
+
         if (args.length == 0 || !args[0].equalsIgnoreCase("reset")) {
             sender.sendMessage("§7/" + label + " reset [all|world <мир>|<ник>] §8— снять состояние способностей");
+            sender.sendMessage("§7/" + label + " reload §8— перечитать classes.json (кулдауны)");
             return true;
         }
 
@@ -118,7 +128,7 @@ public final class SessionManager implements Listener, CommandExecutor, TabCompl
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return List.of("reset");
+        if (args.length == 1) return List.of("reset", "reload");
         if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
             List<String> out = new ArrayList<>();
             out.add("all");

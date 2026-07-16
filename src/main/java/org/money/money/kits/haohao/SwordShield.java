@@ -35,6 +35,7 @@ import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
 import org.money.money.session.KitSession;
+import org.money.money.meta.ClassRegistry;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,17 +50,15 @@ public final class SwordShield implements Listener {
     /* =========================
        Config
        ========================= */
-    private static final double DASH_SPEED = 1.35;
+    private static double DASH_SPEED() { return ClassRegistry.num("haohao", "swordshield", "dashSpeed", 1.35); }
     private static final long DASH_CLEAVE_DELAY_TICKS = 3L;
-    private static final int DASH_COOLDOWN_SECONDS = 7;
-    private static final long DASH_COOLDOWN_MS = DASH_COOLDOWN_SECONDS * 1000L;
 
-    private static final double CLEAVE_DAMAGE = 6.0; // 3 hearts
-    private static final double CLEAVE_RADIUS = 2.4;
-    private static final double CLEAVE_PUSH = 0.8;
+    private static double CLEAVE_DAMAGE() { return ClassRegistry.num("haohao", "swordshield", "cleaveDamage", 6.0); } // 3 hearts
+    private static double CLEAVE_RADIUS() { return ClassRegistry.num("haohao", "swordshield", "cleaveRadius", 2.4); }
+    private static double CLEAVE_PUSH() { return ClassRegistry.num("haohao", "swordshield", "cleavePush", 0.8); }
 
-    private static final double RETURN_HEAL_MULTIPLIER = 0.50;
-    private static final long HANDG_WINDOW_TICKS = 40L; // 1 second
+    private static double RETURN_HEAL_MULTIPLIER() { return ClassRegistry.num("haohao", "swordshield", "returnHealMultiplier", 0.50); }
+    private static long HANDG_WINDOW_TICKS() { return ClassRegistry.numInt("haohao", "swordshield", "reflectWindowTicks", 40); }
     private static final long HANDG_COOLDOWN_TICKS = 20L * 10; // 10 seconds
 
     private static final double GLOW_CHANCE = 0.25;
@@ -210,7 +209,7 @@ public final class SwordShield implements Listener {
 
     private void dashAndCleave(Player p) {
         Vector dir = p.getEyeLocation().getDirection().normalize();
-        p.setVelocity(dir.clone().multiply(DASH_SPEED));
+        p.setVelocity(dir.clone().multiply(DASH_SPEED()));
         p.getWorld().playSound(p.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.9f, 1.2f);
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -223,10 +222,11 @@ public final class SwordShield implements Listener {
         long now = System.currentTimeMillis();
         Long last = dashCooldowns.get(p.getUniqueId());
         if (last == null) return true;
+        long dashCooldownMs = ClassRegistry.seconds("haohao", "swordshield", 7) * 1000L;
         long passed = now - last;
-        if (passed >= DASH_COOLDOWN_MS) return true;
+        if (passed >= dashCooldownMs) return true;
 
-        long secLeft = (DASH_COOLDOWN_MS - passed + 999) / 1000;
+        long secLeft = (dashCooldownMs - passed + 999) / 1000;
         p.sendActionBar(Component.text(secLeft + " sec", NamedTextColor.RED));
         p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.4f, 0.8f);
         return false;
@@ -239,7 +239,7 @@ public final class SwordShield implements Listener {
         if (prev != null) prev.cancel();
 
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            int timeLeft = DASH_COOLDOWN_SECONDS;
+            int timeLeft = ClassRegistry.seconds("haohao", "swordshield", 7);
 
             @Override
             public void run() {
@@ -286,16 +286,11 @@ public final class SwordShield implements Listener {
             LastHit lh = lastHits.get(victim.getUniqueId());
             if (lh == null || lh.nonce != nonce) return;
 
-            ItemStack currentMain = victim.getInventory().getItemInMainHand();
-            ItemStack currentOff = victim.getInventory().getItemInOffHand();
-            if (isHandG(currentMain)) {
-                victim.getInventory().setItemInMainHand(makeHandR());
-            }
-            if (isHandG(currentOff)) {
-                victim.getInventory().setItemInOffHand(makeHandR());
-            }
+            // Окно рикошета истекло: возвращаем зелёный меч в норму ТАМ, где он лежит
+            // (в любом слоте, не только в руках) — та же причина, что и для кулдауна.
+            restoreHandsToReady(victim, this::isHandG);
             lastHits.remove(victim.getUniqueId());
-        }, HANDG_WINDOW_TICKS);
+        }, HANDG_WINDOW_TICKS());
 
         handWindowTasks.put(victim.getUniqueId(), task);
     }
@@ -326,7 +321,7 @@ public final class SwordShield implements Listener {
             attacker.damage(lh.damage(), p);
         }
 
-        double heal = lh.damage() * RETURN_HEAL_MULTIPLIER;
+        double heal = lh.damage() * RETURN_HEAL_MULTIPLIER();
         double max = Objects.requireNonNull(p.getAttribute(Attribute.MAX_HEALTH)).getValue();
         p.setHealth(Math.min(max, p.getHealth() + heal));
 
@@ -349,12 +344,9 @@ public final class SwordShield implements Listener {
 
         BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!KitSession.isInGame(p)) return; // игра кончилась — не выдаём в лобби
-            boolean off = handCooldownOffhand.getOrDefault(p.getUniqueId(), false);
-            if (off) {
-                p.getInventory().setItemInOffHand(makeHandR());
-            } else {
-                p.getInventory().setItemInMainHand(makeHandR());
-            }
+            // Кд закончился: чиним ИМЕННО использованный (жёлтый) меч там, где он сейчас лежит,
+            // а НЕ кладём новый HandR в главную руку — игрок мог давно сменить руку/слот.
+            restoreHandsToReady(p, this::isHandY);
             handCooldownOffhand.remove(p.getUniqueId());
         }, HANDG_COOLDOWN_TICKS);
 
@@ -395,7 +387,7 @@ public final class SwordShield implements Listener {
     }
 
     private void applyDamageAndPushEntities(World world, Location center, Player attacker, Vector direction, Set<UUID> hit) {
-        for (Entity ent : world.getNearbyEntities(center, CLEAVE_RADIUS, CLEAVE_RADIUS, CLEAVE_RADIUS)) {
+        for (Entity ent : world.getNearbyEntities(center, CLEAVE_RADIUS(), CLEAVE_RADIUS(), CLEAVE_RADIUS())) {
             if (!(ent instanceof Player target)) continue;
             if (target.getUniqueId().equals(attacker.getUniqueId())) continue;
             if (!target.isOnline() || target.isDead()) continue;
@@ -404,8 +396,8 @@ public final class SwordShield implements Listener {
 
             hit.add(target.getUniqueId());
 
-            target.damage(CLEAVE_DAMAGE, attacker);
-            Vector push = direction.clone().normalize().multiply(CLEAVE_PUSH).setY(0.2);
+            target.damage(CLEAVE_DAMAGE(), attacker);
+            Vector push = direction.clone().normalize().multiply(CLEAVE_PUSH()).setY(0.2);
             target.setVelocity(target.getVelocity().add(push));
         }
     }
@@ -480,6 +472,25 @@ public final class SwordShield implements Listener {
         im.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
         it.setItemMeta(im);
         return it;
+    }
+
+    /**
+     * Возвращает «использованный» меч-руку (в состоянии {@code isState}) в норму (HandR) ТАМ,
+     * где он реально лежит: главная рука, офф-хенд или любой слот инвентаря. Игрок мог давно
+     * сменить предмет в главной руке или переложить меч в другой слот, поэтому нельзя просто
+     * класть новый HandR в главную руку — чиним именно тот предмет, что использовали.
+     */
+    private void restoreHandsToReady(Player p, java.util.function.Predicate<ItemStack> isState) {
+        var inv = p.getInventory();
+        ItemStack[] storage = inv.getStorageContents(); // слоты 0..35 (хотбар + основной инвентарь)
+        for (int i = 0; i < storage.length; i++) {
+            if (storage[i] != null && isState.test(storage[i])) {
+                inv.setItem(i, makeHandR());
+            }
+        }
+        if (isState.test(inv.getItemInOffHand())) {
+            inv.setItemInOffHand(makeHandR());
+        }
     }
 
     private boolean isKingSword(ItemStack it) {

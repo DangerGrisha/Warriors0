@@ -36,9 +36,6 @@ public final class HuTaoPyroListener implements Listener {
     private static final String TAG_PYRO = "Pyro";
 
     // тайминги
-    private static final int PYRO_DURATION_TICKS   = 20 * 10;  // 10c эффект вокруг игрока
-    private static final int PYRO_COOLDOWN_TICKS   = 20 * 60;  // 60c вернуть краситель
-    private static final int IGNITE_TICKS          = 20;       // ~1c поджигания
     private static final int MONITOR_STEP_TICKS    = 5;        // шаг мониторинга горения
     private static final int MONITOR_MAX_STEPS     = 40;       // максимум ~10c мониторинга (подстраховка)
 
@@ -91,12 +88,13 @@ public final class HuTaoPyroListener implements Listener {
         enablePyro(p);
 
         // вернём предмет через 60с
+        int pyroCooldownTicks = org.money.money.meta.ClassRegistry.ticks("hutao", "pyro", 1200);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!p.isOnline() || !KitSession.isInGame(p)) return;
             p.getInventory().addItem(makePyroStatusDye());
             p.sendMessage("§6Pyro Status§7 is ready again!");
             p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.6f);
-        }, PYRO_COOLDOWN_TICKS);
+        }, pyroCooldownTicks);
     }
 
     /* ===================== Бонус: поджог при ударе Хомой ===================== */
@@ -109,7 +107,7 @@ public final class HuTaoPyroListener implements Listener {
         if (!isHoma(p.getInventory().getItemInMainHand())) return;
 
         double vanilla = e.getDamage();          // что насчитал Minecraft
-        double bonus   = 0.0;                    // если хочешь, добавляй плоский элементальный бонус
+        double bonus   = org.money.money.meta.ClassRegistry.num("hutao", "pyro", "bonusDamage", 0.0); // плоский элементальный бонус
         double total   = vanilla + bonus;
 
         double fin = elemental.applyOnTotalDamage(le, total,
@@ -117,7 +115,8 @@ public final class HuTaoPyroListener implements Listener {
                 40, true);
 
         e.setDamage(fin);                        // важно: не le.damage(...), иначе задвоишь
-        le.setFireTicks(Math.max(le.getFireTicks(), 20));
+        le.setFireTicks(Math.max(le.getFireTicks(),
+                org.money.money.meta.ClassRegistry.numInt("hutao", "pyro", "igniteTicks", 20)));
     }
 
 
@@ -146,7 +145,8 @@ public final class HuTaoPyroListener implements Listener {
         p.playSound(p.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.7f, 1.1f);
 
         // авто-выключение через 10с
-        Bukkit.getScheduler().runTaskLater(plugin, () -> disablePyro(p), PYRO_DURATION_TICKS);
+        int durationTicks = org.money.money.meta.ClassRegistry.numInt("hutao", "pyro", "durationTicks", 200);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> disablePyro(p), durationTicks);
     }
 
     private void disablePyro(Player p) {

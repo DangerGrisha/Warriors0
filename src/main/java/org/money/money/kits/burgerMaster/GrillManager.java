@@ -8,11 +8,13 @@ import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -24,6 +26,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.EulerAngle;
+import org.money.money.util.ItemModels;
 
 import java.util.*;
 
@@ -35,7 +38,7 @@ public final class GrillManager implements Listener {
     private static final double TRAPDOOR_Y_OFFSET = 0.42;          // чуть ниже центра
     private static final double HEAD_PITCH_DEG    = -90.0;         // крышка параллельно полу
     private static final long   GUARD_PERIOD      = 20L;           // 1 сек
-    private static final long   COOK_TIME_TICKS   = 20L * 30;      // 30 секунд на готовку
+    private static long COOK_TIME_TICKS() { return org.money.money.meta.ClassRegistry.numInt("burgermaster", "grill", "cookTimeTicks", 600); }      // 30 секунд на готовку
 
     private static final Component GUI_TITLE = Component.text("Grill");
     private static final int GUI_SIZE = 27; // 3 ряда
@@ -333,9 +336,18 @@ public final class GrillManager implements Listener {
         ItemStack pie = new ItemStack(Material.PUMPKIN_PIE);
         ItemMeta im = pie.getItemMeta();
         switch (type) {
-            case MEAT -> im.displayName(Component.text("Meat Burger", NamedTextColor.GOLD));
-            case DIET -> im.displayName(Component.text("Diet Burger", NamedTextColor.GREEN));
-            case SEA  -> im.displayName(Component.text("Sea Burger",  NamedTextColor.AQUA));
+            case MEAT -> {
+                im.displayName(Component.text("Meat Burger", NamedTextColor.GOLD));
+                ItemModels.apply(im, "burgermaster_beef");
+            }
+            case DIET -> {
+                im.displayName(Component.text("Diet Burger", NamedTextColor.GREEN));
+                ItemModels.apply(im, "burgermaster_diet");
+            }
+            case SEA  -> {
+                im.displayName(Component.text("Sea Burger",  NamedTextColor.AQUA));
+                ItemModels.apply(im, "burgermaster_fish");
+            }
             default   -> im.displayName(Component.text("Burger", NamedTextColor.GRAY));
         }
         im.getPersistentDataContainer().set(KEY_EDIBLE_BURGER, PersistentDataType.STRING, type.name());
@@ -517,12 +529,13 @@ public final class GrillManager implements Listener {
             // создаём джоб
             BurgerJob job = new BurgerJob();
             job.type = type;
-            job.finishAtMs = System.currentTimeMillis() + (COOK_TIME_TICKS * 50L);
+            job.finishAtMs = System.currentTimeMillis() + (COOK_TIME_TICKS() * 50L);
             job.ready = false;
 
             // первичное UI
-            top.setItem(PROG_SLOTS[free], makeCenterProgress(type, 30));
-            top.setItem(OUT_SLOTS[free],  makeOutputCooking(type, 30));
+            int cookSecs = (int) Math.ceil(COOK_TIME_TICKS() / 20.0);
+            top.setItem(PROG_SLOTS[free], makeCenterProgress(type, cookSecs));
+            top.setItem(OUT_SLOTS[free],  makeOutputCooking(type, cookSecs));
 
             // тикер обновления
             job.ticker = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -588,6 +601,27 @@ public final class GrillManager implements Listener {
         e.setCancelled(true);
     }
 
+    /* ==================== Еда: разрешить есть бургер при полном голоде ==================== */
+
+    /**
+     * Бургер — это PUMPKIN_PIE (обычная еда), а её при ПОЛНОМ голоде съесть нельзя, поэтому
+     * эффект бургера был недостижим у сытого игрока. Здесь: если игрок ПКМ по нашему бургеру
+     * и голод полный — снимаем «пол голода» (1 ед. еды = половина иконки). Ванильная проверка
+     * съедобности идёт уже ПОСЛЕ этого события, поэтому бургер съедается тем же кликом.
+     * Во время окна Hungry master голод = 0, так что здесь это no-op.
+     */
+    @EventHandler(ignoreCancelled = false, priority = EventPriority.LOW)
+    public void onBurgerRightClick(PlayerInteractEvent e) {
+        Action a = e.getAction();
+        if (a != Action.RIGHT_CLICK_AIR && a != Action.RIGHT_CLICK_BLOCK) return;
+        if (!isBurgerEdible(e.getItem())) return; // предмет в руке, вызвавшей событие (учитывает и off-hand)
+
+        Player p = e.getPlayer();
+        if (p.getFoodLevel() >= 20) {
+            p.setFoodLevel(19); // −0.5 иконки: ровно чтобы еда стала съедобной
+        }
+    }
+
     /* ==================== Еда: эффекты для pumpkin pie ==================== */
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
@@ -600,9 +634,9 @@ public final class GrillManager implements Listener {
 
         Player p = e.getPlayer();
         switch (BurgerType.valueOf(kind)) {
-            case MEAT -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,    20*30, 0, false, true, true));
-            case DIET -> p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 20*30, 0, false, true, true));
-            case SEA  -> p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,       20*30, 0, false, true, true));
+            case MEAT -> p.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,    org.money.money.meta.ClassRegistry.numInt("burgermaster", "grill", "burgerEffectDurationTicks", 600), 0, false, true, true));
+            case DIET -> p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, org.money.money.meta.ClassRegistry.numInt("burgermaster", "grill", "burgerEffectDurationTicks", 600), 0, false, true, true));
+            case SEA  -> p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,       org.money.money.meta.ClassRegistry.numInt("burgermaster", "grill", "burgerEffectDurationTicks", 600), 0, false, true, true));
             default -> {}
         }
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_BURP, 0.7f, 1.3f);

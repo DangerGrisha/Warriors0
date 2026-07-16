@@ -1,6 +1,6 @@
 name: LastWarriors0
 main: org.money.money.Main
-version: 1.0
+version: 3.1.8
 api-version: 1.21
 softdepend: [Citizens]
 
@@ -17,6 +17,7 @@ commands:
       /kitgive Ishigava <shield|bridge|wall|aura|kunai|clones> [player]
       /kitgive TimeWalker <run|slash|momentum|ult> [player]
       /kitgive Blastborn <gloves|grenade|ult|machinegun> [player]
+      /kitgive BlueRose <oath|ward|rosebind|petal|heritage|garden> [player]
     aliases: [kg]
     permission: kits.give
   warriors:

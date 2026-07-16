@@ -13,6 +13,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.money.money.meta.ClassRegistry;
 
 import java.util.Objects;
 
@@ -23,8 +24,6 @@ import java.util.Objects;
  * - ПКМ по костру (грилю) владельцем — открывает меню (сундук)
  */
 public final class GrillPlaceListener implements Listener {
-
-    private static final long RETURN_DELAY_MS = 60_000L; // 1 мин real-time — кулдаун возврата предмета гриля
 
     private final Plugin plugin;
     private final GrillManager grillManager;
@@ -76,11 +75,12 @@ public final class GrillPlaceListener implements Listener {
         });
 
         // кулдаун: вернуть предмет гриля владельцу через 1 минуту (если у него его ещё нет)
+        final long returnDelayMs = ClassRegistry.millis("burgermaster", "grill", 60_000L);
         final java.util.UUID id = owner.getUniqueId();
         Bukkit.getAsyncScheduler().runDelayed(
                 plugin,
                 t -> Bukkit.getScheduler().runTask(plugin, () -> giveBackGrillIfMissing(id)),
-                RETURN_DELAY_MS,
+                returnDelayMs,
                 java.util.concurrent.TimeUnit.MILLISECONDS
         );
     }

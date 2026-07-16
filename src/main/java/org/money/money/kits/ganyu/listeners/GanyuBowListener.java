@@ -24,13 +24,18 @@ public final class GanyuBowListener implements Listener {
     private final Plugin plugin;
     private final NamespacedKey KEY_GANYU_BOW;
     private final NamespacedKey KEY_ICY_ARROW;
+    private final NamespacedKey KEY_ARROW_OWNER;   // UUID Ганью на каждой её стреле (для детонации по F)
     private final ElementalReactions elemental;
 
-    private static final double FREEZE_RADIUS = 3.0;      // радиус взрыва
-    private static final int    SLOW_TICKS    = 50;       // 3 сек (20 тиков = 1 сек)
-    private static final int    SLOW_LEVEL    = 1;        // Slowness II
-    private static final int    FREEZE_ADD    = 80;       // +4 сек к текущему фризу
-    private static final int    DIRECT_HIT_BONUS_FREEZE = 40; // +2 сек дополнительно при прямом попадании
+    // баланс — читается из ClassRegistry при использовании (def = прежние значения)
+    private static double freezeRadius()          { return org.money.money.meta.ClassRegistry.num("ganyu", "bow", "radius", 3.0); }
+    private static int    slowTicks()             { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bow", "slowDurationTicks", 50); }
+    private static int    slowAmplifier()         { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bow", "slowAmplifier", 1); }
+    private static int    freezeAddTicks()        { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bow", "freezeAddTicks", 80); }
+    private static int    directHitBonusFreeze()  { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bow", "directHitBonusFreezeTicks", 40); }
+    private static double directHitDamage()       { return org.money.money.meta.ClassRegistry.num("ganyu", "bow", "directHitDamage", 1.0); }
+    private static double aoeDamage()             { return org.money.money.meta.ClassRegistry.num("ganyu", "bow", "aoeDamage", 6.0); }
+    private static int    maxGroundedArrows()     { return org.money.money.meta.ClassRegistry.numInt("ganyu", "bow", "maxGroundedArrows", 3); }
 
 
     // когда начал тянуть
@@ -42,6 +47,9 @@ public final class GanyuBowListener implements Listener {
 
     // следим, чтобы снять тэг Cryo после разморозки
     private final Map<UUID, BukkitTask> cryoWatch = new HashMap<>();
+
+    // очередь НАЗЕМНЫХ стрел лука по игроку (лимит «макс N на полу», FIFO). Стрелы ульты сюда не попадают.
+    private final Map<String, Deque<UUID>> groundedArrows = new HashMap<>();
 
 
     private static final boolean DEBUG = false;
@@ -56,6 +64,7 @@ public final class GanyuBowListener implements Listener {
         this.elemental = elemental;
         this.KEY_GANYU_BOW = new NamespacedKey(plugin, "ganyu_bow");
         this.KEY_ICY_ARROW = new NamespacedKey(plugin, "ganyu_icy_arrow");
+        this.KEY_ARROW_OWNER = new NamespacedKey(plugin, "ganyu_arrow_owner");
     }
 
     /* ==== старт натяжения ==== */
@@ -108,17 +117,28 @@ public final class GanyuBowListener implements Listener {
 
         dbg(p, "shoot: elapsed=" + elapsed + "ms, flashed=" + flashedNow + ", charged=" + charged);
 
-        if (charged && e.getProjectile() instanceof org.bukkit.entity.AbstractArrow arrow) {
-            arrow.getPersistentDataContainer().set(KEY_ICY_ARROW, PersistentDataType.BYTE, (byte) 1);
-            p.getWorld().playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.9f);
+        if (e.getProjectile() instanceof org.bukkit.entity.AbstractArrow arrow) {
+            // ВСЕ её стрелы: нельзя подбирать + метим владельцем (чтобы детонировать по F).
+            arrow.setPickupStatus(org.bukkit.entity.AbstractArrow.PickupStatus.DISALLOWED);
+            arrow.getPersistentDataContainer().set(KEY_ARROW_OWNER, PersistentDataType.STRING, id.toString());
+            if (charged) {
+                arrow.getPersistentDataContainer().set(KEY_ICY_ARROW, PersistentDataType.BYTE, (byte) 1);
+                p.getWorld().playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.9f);
+            }
         }
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onHit(ProjectileHitEvent e) {
         if (!(e.getEntity() instanceof org.bukkit.entity.AbstractArrow arrow)) return;
-        Byte tag = arrow.getPersistentDataContainer().get(KEY_ICY_ARROW, PersistentDataType.BYTE);
-        if (tag == null || tag == 0) return;
+        var pdc = arrow.getPersistentDataContainer();
+        Byte tag = pdc.get(KEY_ICY_ARROW, PersistentDataType.BYTE);
+        if (tag == null || tag == 0) {
+            // не заряженная: если ЕЁ стрела воткнулась в блок — учитываем в лимит (макс N на полу)
+            String owner = pdc.get(KEY_ARROW_OWNER, PersistentDataType.STRING);
+            if (owner != null && e.getHitBlock() != null) trackGroundedArrow(owner, arrow);
+            return;
+        }
 
         Location loc = arrow.getLocation();
         World w = loc.getWorld();
@@ -133,23 +153,25 @@ public final class GanyuBowListener implements Listener {
 
         // прямое попадание — +1 урона и усиленная заморозка
         LivingEntity exclude = null;
+        int freezeAdd = freezeAddTicks();
+        int directBonusFreeze = directHitBonusFreeze();
         if (e.getHitEntity() instanceof LivingEntity hit) {
             exclude = hit;
 
             double d = elemental.applyOnTotalDamage(
                     hit,
-                    1.0, // бонус за прямое попадание
+                    directHitDamage(), // бонус за прямое попадание
                     ElementalReactions.Element.CRYO,
-                    /*newAuraTicks=*/FREEZE_ADD + DIRECT_HIT_BONUS_FREEZE,
+                    /*newAuraTicks=*/freezeAdd + directBonusFreeze,
                     /*consumeOnReact=*/true
             );
             if (shooter != null) hit.damage(d, shooter);
             else hit.damage(d);
 
-            applyFreezeAndSlow(hit, FREEZE_ADD + DIRECT_HIT_BONUS_FREEZE);
+            applyFreezeAndSlow(hit, freezeAdd + directBonusFreeze);
         }
         // AOE по радиусу (урон 2.0 = 1 сердце) + заморозка
-        freezeNearby(loc, FREEZE_RADIUS, shooter, exclude);
+        freezeNearby(loc, freezeRadius(), shooter, exclude);
 
         arrow.remove();
     }
@@ -158,9 +180,54 @@ public final class GanyuBowListener implements Listener {
 
     /* ==== сброс/очистка состояний ==== */
     @EventHandler public void onSwap(PlayerItemHeldEvent e)          { reset(e.getPlayer()); }
-    @EventHandler public void onSwapHands(PlayerSwapHandItemsEvent e){ reset(e.getPlayer()); }
     @EventHandler public void onDrop(PlayerDropItemEvent e)          { reset(e.getPlayer()); }
     @EventHandler public void onQuit(PlayerQuitEvent e)              { reset(e.getPlayer()); }
+
+    /** F по луку Ганью: слот НЕ меняем — вместо этого детонируем её наземные стрелы льдом. */
+    @EventHandler(ignoreCancelled = false)
+    public void onSwapHands(PlayerSwapHandItemsEvent e) {
+        Player p = e.getPlayer();
+        if (isGanyuBow(p.getInventory().getItemInMainHand()) || isGanyuBow(p.getInventory().getItemInOffHand())) {
+            e.setCancelled(true);              // слот остаётся как был
+            detonateGroundedArrows(p);
+        }
+        reset(p);
+    }
+
+    /** Взрывает льдом все НАЗЕМНЫЕ (воткнутые, не в полёте) стрелы Ганью — как ледяной удар ульты. */
+    private void detonateGroundedArrows(Player p) {
+        final String ownerId = p.getUniqueId().toString();
+        World w = p.getWorld();
+        int count = 0;
+        for (var ent : w.getEntitiesByClass(org.bukkit.entity.AbstractArrow.class)) {
+            String owner = ent.getPersistentDataContainer().get(KEY_ARROW_OWNER, PersistentDataType.STRING);
+            if (owner == null || !owner.equals(ownerId)) continue;
+            if (!ent.isInBlock()) continue;    // только воткнутые в блок, не летящие
+            Location loc = ent.getLocation();
+            icyExplosion(loc);
+            w.playSound(loc, Sound.BLOCK_GLASS_BREAK, 0.9f, 1.6f);
+            w.playSound(loc, Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.6f, 1.8f);
+            freezeNearby(loc, freezeRadius(), p, null);
+            ent.remove();
+            count++;
+        }
+        if (count > 0) p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.8f, 1.5f);
+        groundedArrows.remove(ownerId); // все наземные стрелы взорваны — очередь чистим
+    }
+
+    /** Учёт наземной стрелы лука: держим не больше {@code maxGroundedArrows} штук — самые старые удаляем (FIFO). */
+    private void trackGroundedArrow(String ownerId, org.bukkit.entity.AbstractArrow arrow) {
+        Deque<UUID> q = groundedArrows.computeIfAbsent(ownerId, k -> new ArrayDeque<>());
+        // убираем из очереди пропавшие стрелы (подобрали/деспавнились/взорвались)
+        q.removeIf(u -> { var ent = Bukkit.getEntity(u); return ent == null || ent.isDead() || !ent.isValid(); });
+        q.addLast(arrow.getUniqueId());
+        int cap = Math.max(1, maxGroundedArrows());
+        while (q.size() > cap) {
+            UUID oldest = q.pollFirst();
+            var ent = Bukkit.getEntity(oldest);
+            if (ent != null) ent.remove();
+        }
+    }
 
     private void reset(Player p) {
         drawingSince.remove(p.getUniqueId());
@@ -171,27 +238,28 @@ public final class GanyuBowListener implements Listener {
 
     private void freezeNearby(Location center, double radius, LivingEntity source, LivingEntity exclude) {
         World w = center.getWorld();
+        int freezeAdd = freezeAddTicks();
         for (var ent : w.getNearbyEntities(center, radius, radius, radius)) {
             if (!(ent instanceof LivingEntity le) || !le.isValid() || le.isDead()) continue;
             if (exclude != null && le.equals(exclude)) continue;
 
             double d = elemental.applyOnTotalDamage(
                     le,
-                    6.0, // 2 сердце
+                    aoeDamage(), // 2 сердце
                     ElementalReactions.Element.CRYO,
-                    /*newAuraTicks=*/FREEZE_ADD,
+                    /*newAuraTicks=*/freezeAdd,
                     /*consumeOnReact=*/true
             );
             if (source != null) le.damage(d, source); else le.damage(d);
 
-            applyFreezeAndSlow(le, FREEZE_ADD);
+            applyFreezeAndSlow(le, freezeAdd);
         }
     }
 
 
 
     private void applyFreezeAndSlow(LivingEntity le, int addFreezeTicks) {
-        le.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, SLOW_TICKS, SLOW_LEVEL, false, true, true));
+        le.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slowTicks(), slowAmplifier(), false, true, true));
         int cur = le.getFreezeTicks();
         int max = le.getMaxFreezeTicks();
         le.setFreezeTicks(Math.min(max, cur + addFreezeTicks));

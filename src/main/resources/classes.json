@@ -1,0 +1,1440 @@
+{
+  "schemaVersion": 2,
+  "_comment": "Источник истины по балансу. cooldownTicks: 20 тиков = 1 секунда. params — урон/радиусы/длительности и т.п. (суффикс Ticks = тики, Seconds = секунды, Ms = миллисекунды). После правки: /warriors reload (рестарт не нужен). Этот же файл читает внешний плагин для меню.",
+  "classes": [
+    {
+      "id": "blastborn",
+      "displayName": "Blastborn",
+      "type": "Bruiser",
+      "rarity": "EPIC",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "gloves",
+          "name": "Blast Gloves",
+          "cooldownTicks": 8,
+          "description": [
+            "Перчатки с двумя режимами (переключение на F).",
+            "Wall Blast — взрыв от стены, отбрасывает тебя для мобильности.",
+            "Air Burst — воздушный взрыв с уроном по площади."
+          ],
+          "params": {
+            "wallRange": 4.0,
+            "wallRadius": 3.0,
+            "wallDamage": 0.0,
+            "wallKnockback": 1.2,
+            "airDistance": 3.0,
+            "airRadius": 3.2,
+            "airDamage": 6.0,
+            "airSelfDamageMultiplier": 0.75,
+            "airKnockback": 1.8
+          }
+        },
+        {
+          "key": "grenade",
+          "name": "Impact Grenade",
+          "cooldownTicks": 600,
+          "description": [
+            "Бросает гранату, взрывающуюся от удара.",
+            "Сильный урон по площади и отброс врагов."
+          ],
+          "params": {
+            "primeTicks": 20,
+            "projectileSpeed": 1.9,
+            "explosionRadius": 4.0,
+            "blockBreakRadius": 3.0,
+            "damage": 12.0,
+            "knockback": 1.5,
+            "selfDestructionGain": 0
+          }
+        },
+        {
+          "key": "machinegun",
+          "name": "Sweat Machine Gun",
+          "cooldownTicks": 1000,
+          "description": [
+            "Очередь из взрывных снарядов.",
+            "Каждый слабее гранаты, но летят быстро и прямо."
+          ],
+          "params": {
+            "projectileCount": 20,
+            "fireIntervalTicks": 2,
+            "projectileSpeed": 2.2,
+            "spread": 0.12,
+            "explosionRadius": 2.5,
+            "damage": 6.0,
+            "knockback": 0.9,
+            "maxLifeTicks": 40,
+            "selfDestructionGain": 0
+          }
+        },
+        {
+          "key": "ult",
+          "name": "Phoenix Detonator",
+          "cooldownTicks": 2400,
+          "description": [
+            "Усиленное состояние, завершающееся мощнейшей детонацией.",
+            "Огромный радиус взрыва и сильный отброс.",
+            "После взрыва возвращает тебя в точку активации."
+          ],
+          "params": {
+            "durationTicks": 200,
+            "finalExplosionRadius": 8.0,
+            "blockBreakRadius": 5.0,
+            "damage": 24.0,
+            "knockback": 3.5
+          }
+        },
+        {
+          "key": "selfdestruction",
+          "name": "Self-Destruction",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Шкала перегрузки (XP-бар): растёт от взрывов перчаток.",
+            "При переполнении — мощный самоподрыв с уроном вокруг."
+          ],
+          "params": {
+            "max": 100,
+            "decayIntervalTicks": 10,
+            "decayAmount": 1,
+            "gainPerGloveExplosion": 10,
+            "overloadDelayTicks": 20,
+            "overloadExplosionRadius": 5.5,
+            "overloadBlockBreakRadius": 4.0,
+            "overloadDamage": 28.0,
+            "overloadKnockback": 2.0,
+            "overloadTotemDamageMultiplier": 0.5,
+            "selfKnockbackMultiplier": 2.25
+          }
+        }
+      ]
+    },
+    {
+      "id": "timewalker",
+      "displayName": "TimeWalker",
+      "type": "Assassin",
+      "rarity": "LEGENDARY",
+      "ceiling": 5,
+      "abilities": [
+        {
+          "key": "run",
+          "name": "Future Run",
+          "cooldownTicks": 900,
+          "description": [
+            "Рывок вперёд в ускоренном времени.",
+            "Через несколько секунд тебя возвращает в точку старта."
+          ],
+          "params": {
+            "dashTicks": 20,
+            "totalTicks": 160,
+            "speedLevel": 60
+          }
+        },
+        {
+          "key": "slash",
+          "name": "Perfect Sever",
+          "cooldownTicks": 160,
+          "description": [
+            "Выпад с коротким неуязвимым кадром.",
+            "Урон растёт от твоей скорости — комбо с разгоном."
+          ],
+          "params": {
+            "iframeTicks": 8,
+            "forwardLaunch": 0.6,
+            "rangeBlocks": 6.0,
+            "baseDamage": 5.0,
+            "speedMultiplier": 13.5,
+            "minDamage": 5.0,
+            "maxDamage": 20.0
+          }
+        },
+        {
+          "key": "momentum",
+          "name": "Momentum Drive",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Тоггл: бег по прямой копит скорость до Speed VIII.",
+            "Резкий поворот сбрасывает разгон.",
+            "Урон от падения снижен и конвертируется в импульс."
+          ],
+          "params": {
+            "maxLevel": 8,
+            "hulkLevel": 5,
+            "knockbackImmuneLevel": 8,
+            "secondsPerLevel": 0.9,
+            "turnResetDegrees": 60.0,
+            "minMoveSpeed": 0.04,
+            "fallDamageMultiplier": 0.5,
+            "fallMomentumTicksPerDamage": 4.0
+          }
+        },
+        {
+          "key": "ult",
+          "name": "Chrono Mirage",
+          "cooldownTicks": 1200,
+          "description": [
+            "Открывает временной домен, бьющий врагов каждые полсекунды.",
+            "Призывает клонов-миражей."
+          ],
+          "params": {
+            "radius": 12.0,
+            "heightBlocks": 2.0,
+            "durationTicks": 120,
+            "damagePerTick": 4.0,
+            "damageIntervalTicks": 10,
+            "cloneCount": 6,
+            "selfSpeedAmplifier": 1,
+            "selfResistanceAmplifier": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "ishigava",
+      "displayName": "Ishigava",
+      "type": "Defender",
+      "rarity": "EPIC",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "shield",
+          "name": "Quick Wall",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Мгновенно ставит водяную стену-щит перед собой.",
+            "Блокирует снаряды и рывки врагов."
+          ],
+          "params": {
+            "spawnDistance": 4.0,
+            "shieldSpeed": 0.06,
+            "lifetimeTicks": 400
+          }
+        },
+        {
+          "key": "bridge",
+          "name": "Water Bridges",
+          "cooldownTicks": 900,
+          "description": [
+            "Строит водяные мосты для передвижения.",
+            "Система зарядов — используй с умом."
+          ],
+          "params": {
+            "minDistance": 5,
+            "maxDistance": 20,
+            "charges": 5,
+            "lifetimeTicks": 400
+          }
+        },
+        {
+          "key": "wall",
+          "name": "Last Wall",
+          "cooldownTicks": 3600,
+          "description": [
+            "Последний рубеж: огромная водяная стена.",
+            "Спасает команду в критический момент."
+          ],
+          "params": {
+            "beaconCount": 12,
+            "holdTicks": 1200
+          }
+        },
+        {
+          "key": "aura",
+          "name": "AURA",
+          "cooldownTicks": 2400,
+          "description": [
+            "Аура вокруг Ishigava (центр — клон в слоте 2).",
+            "Усиливает союзников и давит врагов в радиусе."
+          ],
+          "params": {
+            "durationTicks": 400,
+            "radius": 8.0,
+            "healthLossThreshold": 10.0
+          }
+        },
+        {
+          "key": "kunai",
+          "name": "Kunai Bow",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Лук, стреляющий кунаями-тросами.",
+            "Подтягивает тебя к цели или цель к тебе."
+          ],
+          "params": {
+            "bowDamage": 6.0,
+            "tetherDamage": 5.0,
+            "forceMultiplier": 2.1,
+            "tetherRange": 15.0,
+            "pullSelfSpeed": 0.3667,
+            "pullTargetAirSpeed": 0.8,
+            "pullTargetGroundSpeed": 0.4,
+            "releaseDamage": 4.0
+          }
+        },
+        {
+          "key": "clones",
+          "name": "Mirror Clones",
+          "cooldownTicks": 2400,
+          "description": [
+            "Призывает зеркальных клонов строем.",
+            "F — мгновенно меняться местами с клоном из 3 слотов.",
+            "Запутывает врагов и даёт безопасную ротацию."
+          ],
+          "params": {
+            "durationSeconds": 40,
+            "cloneHealth": 6.0,
+            "spacingBlocks": 2.6
+          }
+        }
+      ]
+    },
+    {
+      "id": "ladynagan",
+      "displayName": "Lady Nagan",
+      "type": "Sniper",
+      "rarity": "LEGENDARY",
+      "ceiling": 5,
+      "abilities": [
+        {
+          "key": "sniper",
+          "name": "T-742K Mori",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Снайперская винтовка с перезарядкой между выстрелами.",
+            "Огромный урон на дистанции."
+          ],
+          "params": {
+            "damage": 8.0,
+            "bulletSpeed": 0.7,
+            "bulletRadius": 0.35,
+            "redirectRadius": 10.0,
+            "bulletLifetimeTicks": 120,
+            "aimSlownessAmp": 3,
+            "aimSlownessSneakAmp": 5
+          }
+        },
+        {
+          "key": "ult",
+          "name": "Ultra Bullet",
+          "cooldownTicks": 2100,
+          "description": [
+            "Заряженный выстрел колоссальной мощности.",
+            "Пробивает всё на своём пути."
+          ],
+          "params": {
+            "damage": 1000.0,
+            "bulletSpeed": 0.7
+          }
+        },
+        {
+          "key": "fly",
+          "name": "Start Fly",
+          "cooldownTicks": 1600,
+          "description": [
+            "Air Walking: 20с окно полёта.",
+            "Зажми Shift — поднимаешься (левитация III), отпустил — падаешь.",
+            "Повторный ПКМ обрывает полёт досрочно."
+          ],
+          "params": {
+            "durationTicks": 400,
+            "levitationAmplifier": 2
+          }
+        },
+        {
+          "key": "trap",
+          "name": "Traps",
+          "cooldownTicks": 300,
+          "description": [
+            "Ставит до 3 ловушек.",
+            "Замедляют и выдают позицию врага."
+          ],
+          "params": {
+            "triggerRadius": 2.0,
+            "explosionPower": 4.0,
+            "damageRadius": 2.0,
+            "damage": 5.0,
+            "lifetimeSeconds": 240
+          }
+        },
+        {
+          "key": "explosion",
+          "name": "Self-Destruction",
+          "cooldownTicks": 1200,
+          "description": [
+            "Аварийный подрыв вокруг себя.",
+            "Спасение, когда враг подошёл вплотную."
+          ],
+          "params": {
+            "radius": 6.0,
+            "damage": 26.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "saske",
+      "displayName": "Saske",
+      "type": "Assassin",
+      "rarity": "EPIC",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "katana",
+          "name": "Saske Katana",
+          "cooldownTicks": 120,
+          "description": [
+            "Удар катаной с особым эффектом.",
+            "Основное оружие ближнего боя."
+          ],
+          "params": {
+            "damage": 5.0,
+            "damageRadius": 1.0,
+            "knockback": 1.5,
+            "dashBackPower": 0.8
+          }
+        },
+        {
+          "key": "shuriken",
+          "name": "Shuriken x3",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Метает сюрикены по прямой.",
+            "Дальний поук без кулдауна."
+          ],
+          "params": {
+            "bonusDamage": 7,
+            "count": 3
+          }
+        },
+        {
+          "key": "body",
+          "name": "Body Replacement",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Техника замены тела — мгновенный телепорт.",
+            "Уход от смертельного удара."
+          ],
+          "params": {
+            "range": 40,
+            "castDelayTicks": 65,
+            "raySize": 0.75,
+            "aimSampleTicks": 20
+          }
+        },
+        {
+          "key": "chidori",
+          "name": "Chidori",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Рывок с молнией в руке.",
+            "Большой урон при попадании."
+          ],
+          "params": {
+            "damage": 19,
+            "dashSpeed": 20,
+            "hitRadius": 1.5,
+            "dashRange": 40,
+            "dashBlocksPerTick": 2.0,
+            "selfDamagePerBlock": 0.5
+          }
+        },
+        {
+          "key": "attraction",
+          "name": "Attraction",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Создаёт зону притяжения врагов.",
+            "Стягивает и наносит урон в центре."
+          ],
+          "params": {
+            "durationTicks": 300,
+            "chargeUpTicks": 40,
+            "radius": 9.0,
+            "pullStrength": 0.5,
+            "damageRadius": 3.0,
+            "damagePerSecond": 4.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "fukuko",
+      "displayName": "Fukuko",
+      "type": "Artillery",
+      "rarity": "RARE",
+      "ceiling": 3,
+      "abilities": [
+        {
+          "key": "pistol",
+          "name": "Pistol",
+          "cooldownTicks": 100,
+          "description": [
+            "Пистолет с быстрыми выстрелами.",
+            "Стабильный урон на средней дистанции."
+          ],
+          "params": {
+            "bulletDamage": 1.0,
+            "bulletSpeed": 1.0,
+            "bulletLifetimeTicks": 22,
+            "bulletHitRadius": 1.0
+          }
+        },
+        {
+          "key": "mortira",
+          "name": "Mortira",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Мортира: навесной обстрел по площади.",
+            "Достаёт врагов за укрытиями."
+          ],
+          "params": {
+            "targetRadius": 30,
+            "explosionRadius": 4.0,
+            "damage": 10.0,
+            "arcHeight": 1.5
+          }
+        },
+        {
+          "key": "bombzone",
+          "name": "Bomb Zone",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Минирует зону бомбами.",
+            "Контроль территории и защита точек."
+          ],
+          "params": {
+            "radius": 10,
+            "durationSeconds": 20
+          }
+        },
+        {
+          "key": "shockgrenade",
+          "name": "Shock Grenade",
+          "cooldownTicks": 400,
+          "description": [
+            "Бросок гранаты: при ударе — НЕВИДИМОЕ электрическое поле",
+            "(радиус 10, живёт 30с). Враг внутри — оглушение 5с",
+            "(полный стоп + электро-эффекты)."
+          ],
+          "params": {
+            "projectileSpeed": 1.6,
+            "fieldRadius": 10.0,
+            "fieldVerticalHalf": 5.0,
+            "fieldDurationTicks": 600,
+            "stunDurationTicks": 100,
+            "reStunGapTicks": 40,
+            "scanIntervalTicks": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "haohao",
+      "displayName": "HaoHao",
+      "type": "Duelist",
+      "rarity": "RARE",
+      "ceiling": 3,
+      "abilities": [
+        {
+          "key": "swordshield",
+          "name": "King's Sword",
+          "cooldownTicks": 140,
+          "description": [
+            "Королевский меч с рывком.",
+            "Комбинирует атаку и защиту в одном предмете."
+          ],
+          "params": {
+            "dashSpeed": 1.35,
+            "cleaveDamage": 6.0,
+            "cleaveRadius": 2.4,
+            "cleavePush": 0.8,
+            "returnHealMultiplier": 0.5,
+            "reflectWindowTicks": 40
+          }
+        },
+        {
+          "key": "mask",
+          "name": "Mask",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Маска короля: баффы команде за киллы и тотемы.",
+            "Каждый режим даёт свой бонус."
+          ],
+          "params": {
+            "killStrengthAmplifier": 2,
+            "killStrengthDurationTicks": 200,
+            "totemStrengthAmplifier": 1,
+            "totemStrengthDurationTicks": 200,
+            "totemStrengthRadius": 10.0,
+            "deathStrengthAmplifier": 1,
+            "deathStrengthDurationTicks": 600
+          }
+        }
+      ]
+    },
+    {
+      "id": "ganyu",
+      "displayName": "Ganyu",
+      "type": "Support",
+      "rarity": "EPIC",
+      "ceiling": 3,
+      "abilities": [
+        {
+          "key": "bow",
+          "name": "Frost Bow",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Ледяной лук — основной урон.",
+            "Накладывает крио-статус на врагов."
+          ],
+          "params": {
+            "directHitDamage": 1.0,
+            "aoeDamage": 6.0,
+            "radius": 3.0,
+            "freezeAddTicks": 80,
+            "directHitBonusFreezeTicks": 40,
+            "slowDurationTicks": 50,
+            "slowAmplifier": 1,
+            "maxGroundedArrows": 3
+          }
+        },
+        {
+          "key": "bud",
+          "name": "Frostbud",
+          "cooldownTicks": 1600,
+          "description": [
+            "Ледяной бутон: периодически ЗАМЕДЛЯЕТ врагов в радиусе (без урона).",
+            "Установка чуть-чуть отбрасывает Ганью назад."
+          ],
+          "params": {
+            "damage": 4.0,
+            "radius": 10.0,
+            "durationTicks": 400,
+            "pulsePeriodTicks": 60,
+            "freezeAddTicks": 80,
+            "slowDurationTicks": 60,
+            "slowAmplifier": 1,
+            "placeRecoil": 0.5
+          }
+        },
+        {
+          "key": "ult",
+          "name": "Everfrost Core",
+          "cooldownTicks": 3000,
+          "description": [
+            "Ледяное ядро — ульта с градом осколков.",
+            "Массовый урон и заморозка в большой зоне."
+          ],
+          "params": {
+            "damage": 4.0,
+            "fieldRadius": 30.0,
+            "durationTicks": 1000,
+            "impactRadius": 6.0,
+            "rainIntervalTicks": 2,
+            "freezeAddTicks": 100,
+            "slowDurationTicks": 80,
+            "slowAmplifier": 1,
+            "arrowDirectDamage": 1.0,
+            "arrowFuseTicks": 20,
+            "arrowSpeed": 0.6
+          }
+        },
+        {
+          "key": "meteor",
+          "name": "Frostfall",
+          "cooldownTicks": 6000,
+          "description": [
+            "Каст ~3.5с, затем с огромной высоты в радиусе 70 падают 10 ледяных метеоритов за 30с.",
+            "Каждый — настоящий взрыв (рушит карту) + лёд. Свои получают только взрыв, враги ещё и лёд+заморозку."
+          ],
+          "params": {
+            "castTicks": 70,
+            "meteorCount": 30,
+            "meteorDurationTicks": 600,
+            "meteorRadius": 50,
+            "meteorHeight": 120,
+            "meteorFallSpeed": 4.0,
+            "explosionPower": 4.0,
+            "breakBlocks": 1,
+            "impactRadius": 6.0,
+            "iceDamage": 6.0,
+            "freezeAddTicks": 100,
+            "slowDurationTicks": 80,
+            "slowAmplifier": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "hutao",
+      "displayName": "Hu Tao",
+      "type": "Bruiser",
+      "rarity": "EPIC",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "homa",
+          "name": "Staff of Homa",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Копьё Хома: урон растёт от потерянного здоровья.",
+            "Чем ты ближе к смерти — тем больнее бьёшь."
+          ],
+          "params": {
+            "damage": 4,
+            "attackSpeed": 0.8
+          }
+        },
+        {
+          "key": "pyro",
+          "name": "Pyro Status",
+          "cooldownTicks": 1200,
+          "description": [
+            "Поджигает оружие пиро-статусом.",
+            "Атаки поджигают врагов и комбинируются с реакциями."
+          ],
+          "params": {
+            "durationTicks": 200,
+            "bonusDamage": 0.0,
+            "igniteTicks": 20
+          }
+        },
+        {
+          "key": "ult",
+          "name": "BOOM",
+          "cooldownTicks": 2400,
+          "description": [
+            "Огненный взрыв вокруг себя.",
+            "Большой урон и поджог всех вокруг."
+          ],
+          "params": {
+            "damage": 28.0,
+            "radius": 10.0,
+            "igniteTicks": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "dio",
+      "displayName": "Dio",
+      "type": "Controller",
+      "rarity": "LEGENDARY",
+      "ceiling": 5,
+      "abilities": [
+        {
+          "key": "timestop",
+          "name": "TIME STOP",
+          "cooldownTicks": 2400,
+          "description": [
+            "ZA WARUDO! Останавливает время для всех вокруг.",
+            "Враги замирают — добивай безнаказанно."
+          ],
+          "params": {
+            "freezeDurationTicks": 100
+          }
+        },
+        {
+          "key": "vampire",
+          "name": "Vampire",
+          "cooldownTicks": 3600,
+          "description": [
+            "Вампиризм: лечишься от нанесённого урона.",
+            "Длительный режим выживания в драке."
+          ],
+          "params": {
+            "durationTicks": 800,
+            "lifestealFraction": 0.36,
+            "healOnStart": 10,
+            "extraMaxHealth": 20
+          }
+        },
+        {
+          "key": "hand",
+          "name": "Stand Hands",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Руки стенда: серия быстрых ударов и рывок.",
+            "Стенд принимает урон вместо хозяина."
+          ],
+          "params": {
+            "punchDamage": 4,
+            "handHitDamage": 2,
+            "punchFallbackDamage": 2,
+            "punchRange": 1.3,
+            "dashMaxDist": 6,
+            "standMaxHp": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "naruto",
+      "displayName": "Naruto",
+      "type": "Skirmisher",
+      "rarity": "RARE",
+      "ceiling": 3,
+      "abilities": [
+        {
+          "key": "rasengan",
+          "name": "Rasengan",
+          "cooldownTicks": 500,
+          "description": [
+            "Сфера чакры в ладони.",
+            "Мощный удар с отбросом при попадании.",
+            "Урон растёт от высоты падения."
+          ],
+          "params": {
+            "baseDamage": 10.0,
+            "damagePerBlock": 1.2,
+            "maxDamage": 70,
+            "basePower": 2.0,
+            "powerPerBlock": 0.2,
+            "maxPower": 20.0,
+            "coreTtlTicks": 300,
+            "jumpDurationTicks": 300,
+            "jumpAmplifier": 2
+          }
+        },
+        {
+          "key": "disappear",
+          "name": "Disappearance Technique",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Техника исчезновения — телепорт по взгляду.",
+            "Уход из фокуса или неожиданная атака."
+          ],
+          "params": {
+            "range": 25.0,
+            "teleportDelayTicks": 40
+          }
+        },
+        {
+          "key": "clones",
+          "name": "Shadow Clones",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Теневые клоны, отвлекающие врагов.",
+            "Классика: попробуй найди настоящего."
+          ],
+          "params": {
+            "count": 15,
+            "lifetimeTicks": 1800,
+            "rangeBlocks": 20,
+            "cloneHealth": 1,
+            "slowDurationTicks": 20,
+            "slowAmplifier": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "uraraka",
+      "displayName": "Uraraka",
+      "type": "Support",
+      "rarity": "RARE",
+      "ceiling": 3,
+      "abilities": [
+        {
+          "key": "glove",
+          "name": "Hammer",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Молот: крит оглушает цель.",
+            "Контроль в ближнем бою."
+          ],
+          "params": {
+            "stunDurationTicks": 20,
+            "stunAmplifier": 1,
+            "stunRadius": 1.5
+          }
+        },
+        {
+          "key": "gravity",
+          "name": "Zero Gravity",
+          "cooldownTicks": 2400,
+          "description": [
+            "Отключает гравитацию врагам в зоне.",
+            "Подвешенные цели беспомощны."
+          ],
+          "params": {
+            "windupTicks": 60,
+            "armedWindowTicks": 200,
+            "windupSlowAmplifier": 2,
+            "levitationDurationTicks": 160,
+            "levitationAmplifier": 0
+          }
+        },
+        {
+          "key": "healpost",
+          "name": "Heal Post",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Ставит точку исцеления для команды.",
+            "Тыловая поддержка в затяжных боях."
+          ],
+          "params": {
+            "radius": 10.0,
+            "healAmount": 4.0,
+            "healPeriodTicks": 100
+          }
+        },
+        {
+          "key": "levmark",
+          "name": "Levitation Mark",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Метка левитации на враге.",
+            "Помеченный взлетает в воздух."
+          ],
+          "params": {
+            "markDurationTicks": 1200,
+            "curseTotalTicks": 200,
+            "curseAmplifier": 1,
+            "ownerLiftDurationTicks": 20,
+            "ownerLiftAmplifier": 29
+          }
+        }
+      ]
+    },
+    {
+      "id": "saberlight",
+      "displayName": "Saber Light",
+      "type": "Duelist",
+      "rarity": "EPIC",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "excalibur",
+          "name": "Excalibur",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Светлый Экскалибур: сила растёт от собранных душ.",
+            "Души — за убийства и обмены."
+          ],
+          "params": {
+            "baseDamage": 7.0,
+            "damagePerSoul": 0.5,
+            "baseAttackSpeed": 1.6,
+            "attackSpeedPerSoul": 0.1,
+            "movementPenaltyPerSoul": 0.0015,
+            "guardBreakThreshold": 12.0,
+            "guardBreakDurationTicks": 100,
+            "blockPercent": 0.8
+          }
+        },
+        {
+          "key": "ult",
+          "name": "Soul Release",
+          "cooldownTicks": 500,
+          "description": [
+            "Высвобождение душ — луч светлой энергии.",
+            "Урон зависит от накопленных душ."
+          ],
+          "params": {
+            "soulCost": 3,
+            "beamRange": 111,
+            "beamHitRadius": 3.0,
+            "beamDamage": 12.0
+          }
+        },
+        {
+          "key": "soultrades",
+          "name": "Soul Trades",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Обмен душ на временные усиления.",
+            "Решай: копить на ульту или усилиться сейчас."
+          ],
+          "params": {
+            "speedPermSoulCost": 1,
+            "jumpTempSoulCost": 1,
+            "jumpPermSoulCost": 1,
+            "tempJumpDurationSeconds": 10,
+            "tempJumpAmplifier": 9,
+            "maxPermSpeedLevel": 3,
+            "maxPermJumpLevel": 3,
+            "totemFirstSoulCost": 3,
+            "totemNextSoulCost": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "saberdark",
+      "displayName": "Saber Dark",
+      "type": "Duelist",
+      "rarity": "EPIC",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "excaliburd",
+          "name": "Excalibur D",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Тёмный Экскалибур: сила растёт от собранных душ.",
+            "Тёмная зеркальная версия светлого клинка."
+          ],
+          "params": {
+            "baseDamage": 7.0,
+            "damagePerSoul": 0.5,
+            "baseAttackSpeed": 1.6,
+            "attackSpeedPerSoul": 0.1,
+            "movementPenaltyPerSoul": 0.0015,
+            "guardBreakThreshold": 12.0,
+            "guardBreakDurationTicks": 100,
+            "blockPercent": 0.8
+          }
+        },
+        {
+          "key": "ultd",
+          "name": "Soul Release D",
+          "cooldownTicks": 500,
+          "description": [
+            "Высвобождение тёмных душ.",
+            "Урон зависит от накопленных душ."
+          ],
+          "params": {
+            "soulCost": 3,
+            "beamRange": 111,
+            "beamHitRadius": 3.0,
+            "beamDamage": 12.0
+          }
+        },
+        {
+          "key": "soultrades",
+          "name": "Soul Trades",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Обмен душ на временные усиления.",
+            "Цены настраиваются у Saber Light (общая система)."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "airwalker",
+      "displayName": "AirWalker",
+      "type": "Skirmisher",
+      "rarity": "EPIC",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "wind",
+          "name": "Wind",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Управление потоками ветра.",
+            "Мобильность и давление на врага."
+          ],
+          "params": {
+            "pushPower": 1.2,
+            "pushUp": 0.15,
+            "radius": 5.0,
+            "anchorRange": 60.0,
+            "anchorRangeUlt": 120.0,
+            "levitationTicks": 20
+          }
+        },
+        {
+          "key": "windsword",
+          "name": "Wind Sword",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Клинок ветра с режущими порывами.",
+            "Основное оружие ближнего боя."
+          ],
+          "params": {
+            "damage": 12.0,
+            "range": 15.0,
+            "hitRadius": 1.1
+          }
+        },
+        {
+          "key": "invis",
+          "name": "Wind Invis",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Растворяется в потоке ветра — невидимость.",
+            "Незаметное перемещение по полю боя."
+          ],
+          "params": {
+            "invisDurationTicks": 600
+          }
+        },
+        {
+          "key": "windult",
+          "name": "Wind Ult",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Ультимативный шторм.",
+            "Раскидывает и режет всех вокруг."
+          ],
+          "params": {
+            "durationTicks": 600,
+            "slowFallStrongAmplifier": 15,
+            "slowFallWeakAmplifier": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "burgermaster",
+      "displayName": "Burger Master",
+      "type": "Support",
+      "rarity": "COMMON",
+      "ceiling": 2,
+      "abilities": [
+        {
+          "key": "grill",
+          "name": "Grill",
+          "cooldownTicks": 1200,
+          "description": [
+            "Ставит гриль и жарит бургеры.",
+            "Еда лечит и баффает команду."
+          ],
+          "params": {
+            "cookTimeTicks": 600,
+            "burgerEffectDurationTicks": 600
+          }
+        },
+        {
+          "key": "garden",
+          "name": "Garden Platform",
+          "cooldownTicks": 1200,
+          "description": [
+            "Создаёт садовую платформу.",
+            "Высота и укрытие в одном."
+          ],
+          "params": {
+            "platformHalfSize": 2
+          }
+        },
+        {
+          "key": "hungry",
+          "name": "Hungry Master",
+          "cooldownTicks": 1200,
+          "description": [
+            "Съешь бургеры за отведённое время —",
+            "превратишься в голодного зверя.",
+            "Сила и скорость на время трансформации."
+          ],
+          "params": {
+            "eatWindowTicks": 200,
+            "burgersRequired": 3,
+            "beastDurationTicks": 1200,
+            "beastResistanceAmplifier": 9,
+            "beastSpeedAmplifier": 3,
+            "beastWeaknessAmplifier": 5
+          }
+        },
+        {
+          "key": "sword",
+          "name": "Sword",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Кухонный клинок мастера.",
+            "Простое и надёжное оружие."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "opera",
+      "displayName": "Opera",
+      "type": "Controller",
+      "rarity": "RARE",
+      "ceiling": 3,
+      "abilities": [
+        {
+          "key": "transformation",
+          "name": "Transformation",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Трансформация (тоггл): призыв/возврат скакуна.",
+            "Скорость передвижения по карте."
+          ]
+        },
+        {
+          "key": "aura",
+          "name": "Opera Aura",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Аура с режимами Attack / Formation / March.",
+            "Баффает союзников в радиусе."
+          ],
+          "params": {
+            "radius": 10.0,
+            "attackAmplifier": 0,
+            "formationAmplifier": 0,
+            "marchSpeedAmplifier": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "blue_rose_guardian",
+      "displayName": "Blue Rose Guardian",
+      "type": "Defender",
+      "rarity": "LEGENDARY",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "passive",
+          "name": "Bloodline Bloom",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Рядом с союзным флагоносцем розы становятся сильнее:",
+            "дольше живут, шире радиус, лечат/щитят и спасают мощнее.",
+            "Особенно ценно в Capture The Flag."
+          ],
+          "params": {
+            "flagCarrierRange": 8.0,
+            "wardDurationMultiplier": 1.25,
+            "wardRadiusBonus": 0.5,
+            "healingMultiplier": 1.15,
+            "shieldMultiplier": 1.15,
+            "emergencyMultiplier": 1.15,
+            "knockbackRadiusBonus": 0.5
+          }
+        },
+        {
+          "key": "seeds",
+          "name": "Rose Seed",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Метки роз: на враге — опасная (раскрывается в slow/шипы),",
+            "на союзнике — защитная (усиливает лечение от роз).",
+            "Максимум 1 активная метка каждого вида на цель."
+          ],
+          "params": {
+            "allyDurationTicks": 100,
+            "enemyDurationTicks": 100,
+            "maxSeedsPerTarget": 1,
+            "enemyDetonationDamage": 1.5,
+            "enemyDetonationSlowDurationTicks": 20,
+            "enemyDetonationSlowAmplifier": 1,
+            "enemyDetonationHitCooldownTicks": 60,
+            "allyHealBonusMultiplier": 1.25
+          }
+        },
+        {
+          "key": "ward",
+          "name": "Blue Rose Ward",
+          "cooldownTicks": 0,
+          "description": [
+            "Ставит на землю голубую розу с защитной зоной (живёт 35с).",
+            "Союзников лечит и чистит, врагов давит slow/weakness.",
+            "Без кулдауна: предмет тратится и возвращается через 60с."
+          ],
+          "params": {
+            "maxActiveWards": 2,
+            "durationTicks": 700,
+            "returnDelayTicks": 1200,
+            "radius": 8.5,
+            "heightLimit": 3.0,
+            "trapSlowAmplifier": 4,
+            "trapDamagePerSecond": 2.0,
+            "dotIntervalTicks": 20,
+            "waveTicks": 12,
+            "allyRegenRadius": 2.0,
+            "allyRegenHealAmount": 0.5,
+            "allyRegenAmplifier": 0,
+            "allyHealIntervalTicks": 20,
+            "allyHealAmount": 1.0,
+            "allyResistanceAmplifier": 0,
+            "enemySlowAmplifier": 1,
+            "enemyWeaknessAmplifier": 0,
+            "enemySeedApplicationCooldownTicks": 60
+          }
+        },
+        {
+          "key": "rosebind",
+          "name": "Rosebind",
+          "cooldownTicks": 600,
+          "description": [
+            "ПКМ — поставить розу (летит по взгляду, садится на блок; гейт 30с).",
+            "ЛКМ зажать/клик — вести розу: вверх — подъём на +1, вниз — падение с высоты.",
+            "Shift+ПКМ — меню режимов: «Стоять» или «Поиск» (гонится за врагом и пьёт жизнь)."
+          ],
+          "params": {
+            "radius": 5.5,
+            "travelSpeed": 0.65,
+            "gravity": 0.035,
+            "maxTravelTicks": 80,
+            "groundSearchDepth": 5,
+            "placeBlockedEnemyRadius": 10.0,
+            "steerStepPerTick": 0.18,
+            "driveWindowTicks": 8,
+            "climbLookUpPitch": -30.0,
+            "fallDownPitch": 30.0,
+            "maxStepDown": 3,
+            "maxFallDown": 32,
+            "huntDetectMultiplier": 1.0,
+            "huntStepPerTick": 0.18,
+            "biteRange": 2.0,
+            "biteIntervalTicks": 10,
+            "biteDamage": 2.0,
+            "biteLifesteal": 1.0,
+            "allyHealIntervalTicks": 20,
+            "allyHealAmount": 1.0,
+            "allyResistanceAmplifier": 0,
+            "enemySlowAmplifier": 1,
+            "enemyWeaknessAmplifier": 0,
+            "enemySeedApplicationCooldownTicks": 60
+          }
+        },
+        {
+          "key": "petalstep",
+          "name": "Petal Step",
+          "cooldownTicks": 1300,
+          "description": [
+            "Короткий рывок вперёд, оставляющий дорожку лепестков сакуры (на уровне ног).",
+            "Дорожка живёт 60с (КД 65с — новый шаг через 5с после её исчезновения).",
+            "Союзникам Speed (и маленький heal), врагам slow + Rose Seed."
+          ],
+          "params": {
+            "dashDistance": 6.5,
+            "dashDurationTicks": 6,
+            "trailDurationTicks": 1200,
+            "allySpeedAmplifier": 1,
+            "allySpeedDurationTicks": 30,
+            "enemySlowAmplifier": 1,
+            "enemySlowDurationTicks": 30,
+            "enemySeedApplicationCooldownTicks": 50
+          }
+        },
+        {
+          "key": "heritage",
+          "name": "Heritage Bloom",
+          "cooldownTicks": 1200,
+          "description": [
+            "Вешает на союзника защитную Голубую Розу (щит-абсорбция).",
+            "Роза висит бессрочно — снимается срабатыванием, смертью,",
+            "выходом или переносом в другой мир.",
+            "При критическом здоровье роза раскрывается: heal/щит,",
+            "отбрасывает и замораживает врагов, краткая неуязвимость."
+          ],
+          "params": {
+            "targetRange": 10.0,
+            "shieldDurationTicks": 100,
+            "initialAbsorption": 2.0,
+            "emergencyHealthThresholdPercent": 30,
+            "emergencyHeal": 3.0,
+            "emergencyAbsorption": 2.0,
+            "emergencyInvulnerabilityTicks": 15,
+            "enemyKnockbackRadius": 3.5,
+            "enemyKnockbackStrength": 1.0,
+            "enemyFreezeDurationTicks": 12,
+            "perTargetEmergencyCooldownTicks": 120
+          }
+        },
+        {
+          "key": "garden",
+          "name": "Garden of the First Rose",
+          "cooldownTicks": 2000,
+          "description": [
+            "Большой сад: ПОЛНОСТЬЮ замораживает всех в радиусе (даже в воздухе).",
+            "Тиммейты не морожены, но получают Slowness в зоне (баланс); лечит союзников.",
+            "First Rose Salvation: один союзник не умрёт в саду."
+          ],
+          "params": {
+            "durationTicks": 200,
+            "castTicks": 60,
+            "effectIntervalTicks": 20,
+            "allyRegenAmplifier": 0,
+            "enemyWitherAmplifier": 0,
+            "enemyDrainDamage": 0.0,
+            "radius": 7.5,
+            "freezeRefreshTicks": 12,
+            "freezeCasterFlag": 1,
+            "allySlowAmplifier": 2,
+            "allyHealIntervalTicks": 20,
+            "allyHealAmount": 1.0,
+            "allyResistanceAmplifier": 0,
+            "flagCarrierSpeedAmplifier": 1,
+            "enemySlowAmplifier": 1,
+            "enemySpikeIntervalTicks": 20,
+            "enemySpikeDamage": 1.5,
+            "enemySpikeHitCooldownTicks": 20,
+            "deathSaveUsesPerGarden": 1,
+            "deathSaveInvulnerabilityTicks": 20,
+            "deathSaveKnockbackRadius": 4.5,
+            "deathSaveKnockbackStrength": 1.4,
+            "deathSaveFreezeDurationTicks": 18
+          }
+        },
+        {
+          "key": "soumetsu",
+          "name": "Kamisato Art: Soumetsu",
+          "cooldownTicks": 6000,
+          "description": [
+            "Морозная буря летит вперёд, замораживая встреченные блоки в синий лёд.",
+            "Наносит урон врагам; лёд держится 60с и откатывается; на льду — замедление."
+          ],
+          "params": {
+            "stormLength": 100,
+            "stormHalfWidth": 30,
+            "stormHeight": 50,
+            "stormBlocksPerTick": 0.25,
+            "iceHoldSeconds": 60,
+            "stormDamage": 6.0,
+            "stormHitCooldownTicks": 10,
+            "iceSlowAmplifier": 0,
+            "maxFrozenBlocks": 20000
+          }
+        },
+        {
+          "key": "sword",
+          "name": "Rose Oath",
+          "cooldownTicks": 0,
+          "passive": true,
+          "description": [
+            "Ритуальный меч семьи. Удар по врагу с активным семенем —",
+            "раскрытие: slow + ледяной шип + небольшой бонус-урон.",
+            "Не делает класс дамагером."
+          ],
+          "params": {
+            "seedDetonationDamage": 1.5,
+            "slowDurationTicks": 20,
+            "slowAmplifier": 1,
+            "internalCooldownPerTargetTicks": 60
+          }
+        }
+      ]
+    }
+  ]
+}

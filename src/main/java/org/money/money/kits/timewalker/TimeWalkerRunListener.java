@@ -22,6 +22,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -46,12 +47,6 @@ public final class TimeWalkerRunListener implements Listener, KitResettable {
 
     private final NamespacedKey KEY_FUTURE_RUN;
 
-    // ===== Config tunables (read once in constructor) =====
-    private final int cooldownSeconds;
-    private final int dashTicks;
-    private final int totalTicks;
-    private final int dashSpeedLevel;
-
     // cooldown stores last use time ms
     private final Map<UUID, Long> lastUse = new HashMap<>();
 
@@ -68,11 +63,6 @@ public final class TimeWalkerRunListener implements Listener, KitResettable {
     public TimeWalkerRunListener(Plugin plugin) {
         this.plugin = Objects.requireNonNull(plugin);
         this.KEY_FUTURE_RUN = new NamespacedKey(plugin, "timewalker_future_run");
-
-        this.cooldownSeconds = plugin.getConfig().getInt("timewalker.run.cooldown-seconds", 45);
-        this.dashTicks = plugin.getConfig().getInt("timewalker.run.dash-ticks", 20);
-        this.totalTicks = plugin.getConfig().getInt("timewalker.run.total-ticks", 160);
-        this.dashSpeedLevel = Math.max(1, plugin.getConfig().getInt("timewalker.run.dash-speed-level", 60));
     }
 
     /* ================== Item ================== */
@@ -110,6 +100,8 @@ public final class TimeWalkerRunListener implements Listener, KitResettable {
 
         UUID id = p.getUniqueId();
         long now = System.currentTimeMillis();
+        // Cooldown read at use time so /warriors reload applies without restart.
+        int cooldownSeconds = ClassRegistry.seconds("timewalker", "run", 45);
         long cooldownMs = cooldownSeconds * 1000L;
 
         if (lastUse.containsKey(id)) {
@@ -173,6 +165,11 @@ public final class TimeWalkerRunListener implements Listener, KitResettable {
     private void activateFutureRun(Player caster) {
         UUID id = caster.getUniqueId();
         World w = caster.getWorld();
+
+        // Balance numbers read at use time (per cast) so /warriors reload applies without restart.
+        final int dashTicks = ClassRegistry.numInt("timewalker", "run", "dashTicks", 20);
+        final int totalTicks = ClassRegistry.numInt("timewalker", "run", "totalTicks", 160);
+        final int dashSpeedLevel = Math.max(1, ClassRegistry.numInt("timewalker", "run", "speedLevel", 60));
 
         // Snapshot start state (preserve yaw/pitch). Do NOT snapshot health.
         Location snapshot = caster.getLocation().clone();

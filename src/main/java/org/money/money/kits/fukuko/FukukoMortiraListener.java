@@ -20,6 +20,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
+import org.money.money.util.ItemModels;
 
 import java.util.List;
 
@@ -35,7 +36,7 @@ public final class FukukoMortiraListener implements Listener {
     private final NamespacedKey KEY_MORTIRA;
 
     private static final Material MORTIRA_MATERIAL = Material.GOLD_BLOCK;
-    private static final int RADIUS = 30;
+    private static int RADIUS() { return org.money.money.meta.ClassRegistry.numInt("fukuko", "mortira", "targetRadius", 30); }
 
     public FukukoMortiraListener(Plugin plugin) {
         this.plugin = plugin;
@@ -87,11 +88,11 @@ public final class FukukoMortiraListener implements Listener {
                     cancel();
                     return;
                 }
-                Player target = findTarget(mortiraLocation, RADIUS, ownerTeam);
+                Player target = findTarget(mortiraLocation, RADIUS(), ownerTeam);
                 if (target != null) {
                     Location spawnLocation = mortiraLocation.clone().add(0, 1, 0);
                     ArmorStand projectile = spawnProjectile(spawnLocation);
-                    launchProjectile(projectile, target.getLocation());
+                    launchProjectile(projectile, target.getLocation(), ownerTeam);
                 }
             }
         }.runTaskTimer(plugin, 0L, 100L); // каждые 5с
@@ -117,7 +118,7 @@ public final class FukukoMortiraListener implements Listener {
         return projectile;
     }
 
-    private void launchProjectile(ArmorStand projectile, Location targetLocation) {
+    private void launchProjectile(ArmorStand projectile, Location targetLocation, String ownerTeam) {
         Location start = projectile.getLocation();
         Vector direction = targetLocation.toVector().subtract(start.toVector()).normalize();
 
@@ -125,7 +126,7 @@ public final class FukukoMortiraListener implements Listener {
         double speed = Math.min(1.5, distance / 80);
 
         direction.multiply(speed);
-        direction.setY(1.5);
+        direction.setY(org.money.money.meta.ClassRegistry.num("fukuko", "mortira", "arcHeight", 1.5));
 
         new BukkitRunnable() {
             int ticks = 0;
@@ -140,7 +141,7 @@ public final class FukukoMortiraListener implements Listener {
                 Location currentLocation = projectile.getLocation();
                 Block blockBelow = currentLocation.clone().add(0, -1, 0).getBlock();
                 if (blockBelow.getType() != Material.AIR && blockBelow.getType() != MORTIRA_MATERIAL) {
-                    explodeProjectile(projectile);
+                    explodeProjectile(projectile, ownerTeam);
                     cancel();
                     return;
                 }
@@ -151,15 +152,19 @@ public final class FukukoMortiraListener implements Listener {
         }.runTaskTimer(plugin, 0L, 1L);
     }
 
-    private void explodeProjectile(ArmorStand projectile) {
+    private void explodeProjectile(ArmorStand projectile, String ownerTeam) {
         Location explosionLocation = projectile.getLocation();
         projectile.getWorld().spawnParticle(Particle.EXPLOSION, explosionLocation, 1);
         projectile.getWorld().playSound(explosionLocation, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
 
-        double explosionRadius = 4.0;
+        double explosionRadius = org.money.money.meta.ClassRegistry.num("fukuko", "mortira", "explosionRadius", 4.0);
+        double damage = org.money.money.meta.ClassRegistry.num("fukuko", "mortira", "damage", 10.0);
         for (Entity entity : projectile.getWorld().getNearbyEntities(explosionLocation, explosionRadius, explosionRadius, explosionRadius)) {
-            if (entity instanceof LivingEntity le) {
-                le.damage(10.0);
+            if (entity instanceof Player pl) {
+                if (getTeam(pl).equals(ownerTeam)) continue;   // не бьём свою команду/себя
+                pl.damage(damage);
+            } else if (entity instanceof LivingEntity le) {
+                le.damage(damage);
             }
         }
         projectile.remove();
@@ -182,23 +187,35 @@ public final class FukukoMortiraListener implements Listener {
     }
 
     private ArmorStand summonTurret(Location location) {
-        ArmorStand armorStand = location.getWorld().spawn(location.clone().add(0.5, 0, 0.5), ArmorStand.class);
-        armorStand.setVisible(true);
-        armorStand.setGravity(false);
-        armorStand.setCanPickupItems(false);
-        armorStand.setBasePlate(false);
-        armorStand.setInvulnerable(true);
-        armorStand.setCustomName("Mortira");
-        armorStand.setCustomNameVisible(false);
-        armorStand.setArms(true);
-        armorStand.setSmall(false);
+        Location at = location.clone().add(0.5, 0, 0.5);
+        // Два арморстенда в одной точке: «рука» (fukuko_mortira) и «ствол» (fukuko_mortiradulo).
+        ArmorStand arm = spawnTurretStand(at, makeArmItem("MortiraArm",  "fukuko_mortira"));
+        spawnTurretStand(at, makeArmItem("MortiraDulo", "fukuko_mortiradulo"));
+        return arm;
+    }
 
-        ItemStack arm = new ItemStack(Material.BLUE_DYE);
-        ItemMeta armMeta = arm.getItemMeta();
-        armMeta.setDisplayName("MortiraArm");
-        arm.setItemMeta(armMeta);
-        armorStand.getEquipment().setItemInMainHand(arm);
-        return armorStand;
+    private ArmorStand spawnTurretStand(Location at, ItemStack hand) {
+        ArmorStand as = at.getWorld().spawn(at, ArmorStand.class);
+        as.setVisible(true);
+        as.setGravity(false);
+        as.setCanPickupItems(false);
+        as.setBasePlate(false);
+        as.setInvulnerable(true);
+        as.setCustomName("Mortira");
+        as.setCustomNameVisible(false);
+        as.setArms(true);
+        as.setSmall(false);
+        as.getEquipment().setItemInMainHand(hand);
+        return as;
+    }
+
+    private ItemStack makeArmItem(String name, String model) {
+        ItemStack it = new ItemStack(Material.BLUE_DYE);
+        ItemMeta meta = it.getItemMeta();
+        meta.setDisplayName(name);
+        ItemModels.apply(meta, model);   // item_model запрошен явно (текстуры есть)
+        it.setItemMeta(meta);
+        return it;
     }
 
     private boolean isNearPlayersOrArmorStands(Location location, Player placer, int radius) {

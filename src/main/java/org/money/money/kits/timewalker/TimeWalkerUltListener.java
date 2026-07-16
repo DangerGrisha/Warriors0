@@ -23,6 +23,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitResettable;
 import org.money.money.session.KitSession;
 
@@ -47,16 +48,8 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
     // Item marker
     private final NamespacedKey KEY_CHRONO_MIRAGE;
 
-    // ===== Config (read once) =====
-    private final double radius;
-    private final long durationTicks;     // duration-seconds * 20
-    private final double damagePerTick;
-    private final int tickPeriod;         // ticks between damage applications
-    private final int cloneCount;
+    // ===== Config (read once; cosmetic only — balance numbers come from ClassRegistry at use time) =====
     private final String cloneSkin;
-    private final long cooldownTicks;     // cooldown-seconds * 20
-    private final int selfSpeedAmp;
-    private final int selfResistanceAmp;  // < 0 means "no resistance"
 
     // ===== Active state =====
     private final Map<UUID, BukkitTask> activeTasks = new HashMap<>();
@@ -70,15 +63,17 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
         this.plugin = Objects.requireNonNull(plugin);
         this.KEY_CHRONO_MIRAGE = new NamespacedKey(plugin, "timewalker_chrono_mirage");
 
-        this.radius = plugin.getConfig().getDouble("timewalker.ult.radius", 36.0);
-        this.durationTicks = Math.max(1L, plugin.getConfig().getInt("timewalker.ult.duration-seconds", 6)) * 20L;
-        this.damagePerTick = plugin.getConfig().getDouble("timewalker.ult.damage-per-tick", 4.0);
-        this.tickPeriod = Math.max(1, plugin.getConfig().getInt("timewalker.ult.tick-period", 10));
-        this.cloneCount = Math.max(1, plugin.getConfig().getInt("timewalker.ult.clone-count", 6));
         this.cloneSkin = plugin.getConfig().getString("timewalker.ult.clone-skin", "seirah515");
-        this.cooldownTicks = Math.max(1L, plugin.getConfig().getInt("timewalker.ult.cooldown-seconds", 60)) * 20L;
-        this.selfSpeedAmp = plugin.getConfig().getInt("timewalker.ult.self-speed-amplifier", 1);
-        this.selfResistanceAmp = plugin.getConfig().getInt("timewalker.ult.self-resistance-amplifier", 0);
+    }
+
+    /* ================== Registry reads (use-time, hot-reloadable) ================== */
+
+    private static double radius() {
+        return ClassRegistry.num("timewalker", "ult", "radius", 36.0);
+    }
+
+    private static int cloneCount() {
+        return Math.max(1, ClassRegistry.numInt("timewalker", "ult", "cloneCount", 6));
     }
 
     /* ================== Item ================== */
@@ -183,6 +178,9 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
         final Location anchor = caster.getLocation().clone();
         final World world = anchor.getWorld();
 
+        // Balance numbers read at use time (per cast) so /warriors reload applies without restart.
+        final long durationTicks = Math.max(1L, ClassRegistry.numInt("timewalker", "ult", "durationTicks", 120));
+
         caster.addScoreboardTag(TAG_MIRAGE);
         applySelfBuff(caster);
 
@@ -217,6 +215,7 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
                 drawGroundRing(world, anchor, ringDust);
 
                 // Whirling clones (fast circular motion), rendered purely with particles.
+                int cloneCount = cloneCount();
                 baseAngle += 0.55; // advances quickly each tick
                 final double prevAngle = baseAngle - 0.55;
                 for (int i = 0; i < cloneCount; i++) {
@@ -247,6 +246,7 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
                 }
 
                 // Damage tick.
+                int tickPeriod = Math.max(1, ClassRegistry.numInt("timewalker", "ult", "damageIntervalTicks", 10));
                 if (elapsed % tickPeriod == 0) {
                     damageEnemiesInDomain(online, anchor);
                 }
@@ -265,13 +265,15 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
         if (Bukkit.getPluginManager().getPlugin("Citizens") != null) {
             try {
                 if (clones == null) clones = new TimeWalkerMirageClones(plugin);
-                clones.start(caster, anchor, radius, cloneCount, durationTicks, cloneSkin);
+                clones.start(caster, anchor, radius(), cloneCount(), durationTicks, cloneSkin);
             } catch (Throwable t) {
                 plugin.getLogger().warning("[TimeWalker] Citizens clones unavailable: " + t.getMessage());
             }
         }
 
         // Return the item ONLY after the full cooldown, and ONLY if still in-game.
+        // Cooldown read at use time so /warriors reload applies without restart.
+        final long cooldownTicks = Math.max(1L, ClassRegistry.seconds("timewalker", "ult", 60)) * 20L;
         BukkitTask cooldownTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             cooldownTasks.remove(id);
             Player online = Bukkit.getPlayer(id);
@@ -287,12 +289,14 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
     /* ================== Geometry / visuals ================== */
 
     private Location clonePosition(Location anchor, double angle) {
+        double radius = radius();
         double x = anchor.getX() + Math.cos(angle) * radius;
         double z = anchor.getZ() + Math.sin(angle) * radius;
         return new Location(anchor.getWorld(), x, anchor.getY() + 1.0, z);
     }
 
     private void drawGroundRing(World w, Location anchor, Particle.DustOptions dust) {
+        double radius = radius();
         // Sample count scales with the radius so the (now large) circle still reads as a ring.
         final int samples = Math.max(24, (int) Math.round(radius * 2.0));
         for (int i = 0; i < samples; i++) {
@@ -321,14 +325,22 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
 
     private void damageEnemiesInDomain(Player caster, Location anchor) {
         World w = anchor.getWorld();
-        double r = radius;
+        // Balance numbers read at use time so /warriors reload applies without restart.
+        double r = radius();
+        double height = ClassRegistry.num("timewalker", "ult", "heightBlocks", 2.0);
+        double damagePerTick = ClassRegistry.num("timewalker", "ult", "damagePerTick", 4.0);
         for (Entity ent : w.getNearbyEntities(anchor, r, r, r)) {
             if (!(ent instanceof Player target)) continue;
             if (!target.isOnline() || target.isDead()) continue;
             if (target.equals(caster)) continue;
             if (isFriendly(caster, target)) continue;
-            // Confirm it is actually within the spherical radius of the anchor.
-            if (target.getLocation().distanceSquared(anchor) > r * r) continue;
+            // Цилиндр: в радиусе по горизонтали и не выше/ниже height по вертикали
+            // (поднялся выше 2 блоков — урон не проходит).
+            Location tl = target.getLocation();
+            double dx = tl.getX() - anchor.getX();
+            double dz = tl.getZ() - anchor.getZ();
+            if (dx * dx + dz * dz > r * r) continue;
+            if (Math.abs(tl.getY() - anchor.getY()) > height) continue;
 
             target.damage(damagePerTick, caster);
             w.spawnParticle(Particle.CRIT, target.getLocation().add(0, 1.0, 0), 6, 0.2, 0.3, 0.2, 0.05);
@@ -340,7 +352,10 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
 
     private void applySelfBuff(Player p) {
         // Refreshed each tick; short duration buffer so it falls off promptly on end.
+        // Amplifiers read at use time so /warriors reload applies without restart (< 0 = no effect).
         int dur = 30;
+        int selfSpeedAmp = ClassRegistry.numInt("timewalker", "ult", "selfSpeedAmplifier", 1);
+        int selfResistanceAmp = ClassRegistry.numInt("timewalker", "ult", "selfResistanceAmplifier", 0);
         if (selfSpeedAmp >= 0) {
             p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, dur, selfSpeedAmp, false, false, false));
         }
@@ -384,6 +399,7 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
             w.playSound(anchor, Sound.ENTITY_ELDER_GUARDIAN_CURSE, 0.8f, 0.7f);
             w.playSound(anchor, Sound.BLOCK_BEACON_DEACTIVATE, 0.8f, 0.9f);
             Particle.DustOptions burst = new Particle.DustOptions(Color.fromRGB(40, 170, 255), 1.4f);
+            double radius = radius();
             w.spawnParticle(Particle.DUST, anchor.clone().add(0, 1.0, 0), 40, radius * 0.4, 0.8, radius * 0.4, 0.0, burst);
             w.spawnParticle(Particle.SOUL_FIRE_FLAME, anchor.clone().add(0, 1.0, 0), 20, 0.3, 0.6, 0.3, 0.05);
         }
@@ -437,7 +453,8 @@ public final class TimeWalkerUltListener implements Listener, KitResettable {
     public void onDeath(PlayerDeathEvent e) {
         Player p = e.getEntity();
         endMirage(p.getUniqueId(), null, false);
-        cancelCooldownTask(p.getUniqueId());
+        // НЕ отменяем кулдаун-возврат: игрок остаётся онлайн после смерти — ульта должна вернуться
+        // по истечении кд (возврат и так гейтит isOnline/isInGame). Отмена здесь = ульта пропадала навсегда.
         p.removeScoreboardTag(TAG_MIRAGE);
         removeSelfBuff(p);
     }

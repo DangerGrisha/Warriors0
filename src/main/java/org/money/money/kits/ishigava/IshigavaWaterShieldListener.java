@@ -16,6 +16,8 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
+import org.money.money.meta.ClassRegistry;
+import org.money.money.util.ItemModels;
 
 import java.util.List;
 
@@ -57,7 +59,8 @@ public class IshigavaWaterShieldListener implements Listener {
                 spawnShieldStructure(player, plugin);
             } else {
                 Vector direction = player.getEyeLocation().getDirection();
-                Location spawnLocation = player.getLocation().add(direction.multiply(4)).add(0, 1, 0);
+                double spawnDistance = ClassRegistry.num("ishigava", "shield", "spawnDistance", 4.0);
+                Location spawnLocation = player.getLocation().add(direction.multiply(spawnDistance)).add(0, 1, 0);
                 spawnSingleMovingShield(spawnLocation, plugin, direction);
             }
         }
@@ -78,12 +81,14 @@ public class IshigavaWaterShieldListener implements Listener {
             ItemStack limeDye = new ItemStack(Material.LIME_DYE);
             ItemMeta dyeMeta = limeDye.getItemMeta();
             dyeMeta.displayName(Component.text("WaterShieldMove"));
+            ItemModels.apply(dyeMeta, "ishigava_water_shield_move_water_shield");
             limeDye.setItemMeta(dyeMeta);
             stand.getEquipment().setItemInMainHand(limeDye);
 
             moveArmorStand(stand, direction, plugin);
 
-            plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, stand::remove, 400L);
+            plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, stand::remove,
+                    (long) ClassRegistry.numInt("ishigava", "shield", "lifetimeTicks", 400));
         });
     }
 
@@ -91,7 +96,8 @@ public class IshigavaWaterShieldListener implements Listener {
         new BukkitRunnable() {
             public void run() {
                 if (!stand.isValid()) { cancel(); return; }
-                stand.teleport(stand.getLocation().add(direction.clone().multiply(0.06)));
+                double shieldSpeed = ClassRegistry.num("ishigava", "shield", "shieldSpeed", 0.06);
+                stand.teleport(stand.getLocation().add(direction.clone().multiply(shieldSpeed)));
             }
         }.runTaskTimer(plugin, 0L, 2L);
     }
@@ -112,11 +118,13 @@ public class IshigavaWaterShieldListener implements Listener {
                 ItemStack limeDye = new ItemStack(Material.LIME_DYE);
                 ItemMeta dyeMeta = limeDye.getItemMeta();
                 dyeMeta.displayName(Component.text("WaterShield"));
+                ItemModels.apply(dyeMeta, "ishigava_water_shield_water_shield");
                 limeDye.setItemMeta(dyeMeta);
                 stand.getEquipment().setItemInMainHand(limeDye);
             }
 
-            plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, stand::remove, 400L);
+            plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, stand::remove,
+                    (long) ClassRegistry.numInt("ishigava", "shield", "lifetimeTicks", 400));
         });
     }
 

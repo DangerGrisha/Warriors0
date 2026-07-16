@@ -27,6 +27,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
+import org.money.money.util.ItemModels;
 
 import java.util.*;
 
@@ -45,25 +46,26 @@ public final class DioHandListener implements Listener {
     private static final double FOLLOW_TP_MAX_DIST = 10.0;
     private static final long   FOLLOW_PERIOD      = 2L;
 
-    private static final double DASH_MAX_DIST      = 6.0;
     private static final double DASH_STEP          = 0.8;
     private static final long   DASH_PERIOD        = 1L;
 
     private static final long   ANCHOR_TIME_TICKS  = 20L * 3; // 3 сек
     private static final long   PUNCH_PERIOD       = 6L;      // 0.3 сек
 
-    private static final double PUNCH_RANGE        = 1.3;
-    private static final double PUNCH_DAMAGE       = 5; // половинка сердца
-    private static final double HAND_HIT_DAMAGE    = 3.0; // урон обычного удара мечом-«рукой» (было 7 у алмазного меча)
-
     // ===== ломаемый стенд =====
-    private static final double STAND_MAX_HP    = 30.0;    // ~5 заряженных ударов алмазным мечом
     private static final long   STAND_DISABLE_MS = 60_000L; // после поломки стенд недоступен 60с
 
     // урон-фоллбэк
     private static final boolean TRUE_DAMAGE_FALLBACK = true;
-    private static final double  PUNCH_FALLBACK       = 2.0;  // 1 сердце
     private static final boolean STRIP_ABSORPTION     = true;
+
+    // баланс — читается из ClassRegistry при использовании (def = прежние значения)
+    private static double dashMaxDist()    { return org.money.money.meta.ClassRegistry.num("dio", "hand", "dashMaxDist", 6.0); }
+    private static double punchRange()     { return org.money.money.meta.ClassRegistry.num("dio", "hand", "punchRange", 1.3); }
+    private static double punchDamage()    { return org.money.money.meta.ClassRegistry.num("dio", "hand", "punchDamage", 5.0); }
+    private static double handHitDamage()  { return org.money.money.meta.ClassRegistry.num("dio", "hand", "handHitDamage", 3.0); }
+    private static double punchFallback()  { return org.money.money.meta.ClassRegistry.num("dio", "hand", "punchFallbackDamage", 2.0); }
+    private static double standMaxHp()     { return org.money.money.meta.ClassRegistry.num("dio", "hand", "standMaxHp", 30.0); }
 
     /* ====== поля ====== */
 
@@ -96,6 +98,7 @@ public final class DioHandListener implements Listener {
         meta.displayName(Component.text("hand"));
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
         meta.getPersistentDataContainer().set(KEY_HAND_ITEM, PersistentDataType.BYTE, (byte)1);
+        ItemModels.apply(meta, "dio_diohand");
         it.setItemMeta(meta);
         return it;
     }
@@ -245,7 +248,7 @@ public final class DioHandListener implements Listener {
         Location spawn = offsetBehindRight(p);
         ArmorStand as = spawnStand(spawn, p);
         stands.put(p.getUniqueId(), as);
-        standHp.putIfAbsent(p.getUniqueId(), STAND_MAX_HP); // HP сохраняется между свапами; полное только при поломке/смерти
+        standHp.putIfAbsent(p.getUniqueId(), standMaxHp()); // HP сохраняется между свапами; полное только при поломке/смерти
         log("ensureStand: spawned at " + fmt(spawn) + " for " + p.getName());
     }
 
@@ -287,6 +290,7 @@ public final class DioHandListener implements Listener {
         cancelTask(followLoops.remove(id));
 
         Vector dir = owner.getLocation().getDirection().normalize();
+        final double dashMaxDist = dashMaxDist();
         final double[] travelled = {0.0};
 
         log("dash: START from " + fmt(st.getLocation()) + " dir=" + fmt(dir));
@@ -320,7 +324,7 @@ public final class DioHandListener implements Listener {
             travelled[0] += DASH_STEP;
             st.teleport(next);
 
-            if (travelled[0] >= DASH_MAX_DIST) {
+            if (travelled[0] >= dashMaxDist) {
                 log("dash: reached MAX distance at " + fmt(next));
                 anchor(owner, st);
                 stopDash(id);
@@ -374,12 +378,12 @@ public final class DioHandListener implements Listener {
         BukkitTask punches = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!owner.isOnline() || owner.isDead() || !st.isValid()) { log("anchor: abort punches (owner/stand invalid)"); return; }
 
-            LivingEntity target = nearestEnemy(st.getLocation(), owner, PUNCH_RANGE, st);
+            LivingEntity target = nearestEnemy(st.getLocation(), owner, punchRange(), st);
             if (target != null) {
                 log("anchor: punch target=" + target.getType()
                         + " hp=" + String.format(Locale.US, "%.2f", target.getHealth())
                         + (target instanceof Player pl ? " abs=" + String.format(Locale.US, "%.2f", pl.getAbsorptionAmount()) : ""));
-                applyPunch(owner, target, PUNCH_DAMAGE);
+                applyPunch(owner, target, punchDamage());
                 target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 10, 0, false, false, false));
             } else {
                 log("anchor: punch no player in range");
@@ -435,7 +439,7 @@ public final class DioHandListener implements Listener {
         if (e.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) return;
         if (!(e.getDamager() instanceof Player p)) return;
         if (!isHandSword(p.getInventory().getItemInMainHand())) return;
-        e.setDamage(HAND_HIT_DAMAGE);
+        e.setDamage(handHitDamage());
     }
 
     /* ====== ломаемый стенд ====== */
@@ -465,8 +469,9 @@ public final class DioHandListener implements Listener {
         Player owner = Bukkit.getPlayer(ownerId);
         if (owner != null && isTeammate(owner, attacker)) return; // тиммейты тоже не ломают
 
+        double standMaxHp = standMaxHp();
         double dmg = Math.max(1.0, e.getDamage());
-        double hp = standHp.getOrDefault(ownerId, STAND_MAX_HP) - dmg;
+        double hp = standHp.getOrDefault(ownerId, standMaxHp) - dmg;
 
         as.getWorld().playSound(as.getLocation(), Sound.ENTITY_IRON_GOLEM_HURT, 0.7f, 1.3f);
         as.getWorld().spawnParticle(Particle.CRIT, as.getLocation().clone().add(0, 1.0, 0), 8, 0.3, 0.5, 0.3, 0.0);
@@ -475,7 +480,7 @@ public final class DioHandListener implements Listener {
             breakStand(ownerId, attacker);
         } else {
             standHp.put(ownerId, hp);
-            attacker.sendActionBar(Component.text("Стенд: " + (int) Math.ceil(hp) + "/" + (int) STAND_MAX_HP + " HP",
+            attacker.sendActionBar(Component.text("Стенд: " + (int) Math.ceil(hp) + "/" + (int) standMaxHp + " HP",
                     NamedTextColor.YELLOW));
         }
     }
@@ -545,7 +550,7 @@ public final class DioHandListener implements Listener {
         if (changed) return;
 
         // фоллбэк — «истинный» урон
-        double dmg = Math.max(amount, PUNCH_FALLBACK);
+        double dmg = Math.max(amount, punchFallback());
         double newHp = Math.max(0.0, before - dmg);
 
         if (STRIP_ABSORPTION && target instanceof Player pl) {

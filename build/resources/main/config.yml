@@ -137,3 +137,30 @@ classes:
       handBlastGainDuringUltimate: 0
       allowGrenadeDuringUltimate: false
       returnToOriginalLocation: true
+
+  # ===== Blue Rose Guardian =====
+  # Легендарный Defender / Support / Zone Controller на силе живых голубых морозных роз.
+  # ВЕСЬ баланс (кулдауны, радиусы, длительности, лечение, урон, амплитуды) — в classes.json
+  # (ключ "blue_rose_guardian"), читается в момент использования: /warriors reload без рестарта.
+  # Здесь — только булевы тогглы и детект флагоносца (флаг живёт во внешнем мини-гейм-плагине).
+  blue_rose_guardian:
+    # Garden of the First Rose — спасение "First Rose Salvation".
+    death-save-enabled: true
+    # Спасать ли от падения в бездну (VOID). По умолчанию нет (конфликт с режимами).
+    allow-void-save: false
+    # Heritage Bloom: можно ли вешать на себя как fallback (когда нет цели). Слабее (множитель ниже).
+    self-cast-enabled: true
+    self-cast-multiplier: 0.5
+    # Детект флагоносца для Bloodline Bloom / Garden Speed. Best-effort, т.к. флаг — внешний.
+    # (1) scoreboard-теги флагоносца, которые ставит мини-гейм-плагин:
+    flag-carrier-tags:
+      - flagcarrier
+      - hasflag
+      - carryingflag
+      - hasFlag
+    # (2) предмет-флаг по item_model (неймспейс lastwar:), напр. lastwar:banner_bow.
+    #     Укажите префиксы path'ов ваших флаговых предметов (без неймспейса):
+    flag-item-model-prefixes:
+      - banner_bow
+      - banner_infly
+      - banner_red_dye

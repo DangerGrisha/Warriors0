@@ -34,7 +34,7 @@ public final class FukukoBombZoneListener implements Listener {
     private final NamespacedKey KEY_BOMBZONE;
 
     private static final Material ZONE_MATERIAL = Material.REDSTONE_BLOCK;
-    private static final int RADIUS = 10;
+    private static int RADIUS() { return org.money.money.meta.ClassRegistry.numInt("fukuko", "bombzone", "radius", 10); }
 
     public FukukoBombZoneListener(Plugin plugin) {
         this.plugin = plugin;
@@ -75,9 +75,9 @@ public final class FukukoBombZoneListener implements Listener {
         // центр = там, где ванилла поставит REDSTONE_BLOCK
         Location bombZoneLocation = event.getClickedBlock().getLocation().add(0, 1, 0);
 
-        createParticleSquare(bombZoneLocation, RADIUS);
-        createCycleOfCheckPlayers(bombZoneLocation, RADIUS, playerTeam);
-        removeBombZoneAfterDelay(bombZoneLocation, 20);
+        createParticleSquare(bombZoneLocation, RADIUS());
+        createCycleOfCheckPlayers(bombZoneLocation, RADIUS(), playerTeam);
+        removeBombZoneAfterDelay(bombZoneLocation, org.money.money.meta.ClassRegistry.numInt("fukuko", "bombzone", "durationSeconds", 20));
     }
 
     private void removeBombZoneAfterDelay(Location location, int seconds) {

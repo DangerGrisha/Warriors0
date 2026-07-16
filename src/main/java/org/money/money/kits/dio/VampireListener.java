@@ -22,6 +22,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.money.money.util.ItemModels;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -30,13 +31,7 @@ public final class VampireListener implements Listener {
 
     // тайминги
     private static final long WINDUP_TICKS     = 20L * 3;   // 3s замедление/звуки
-    private static final long FORM_TICKS       = 20L * 40;  // 40s форма
-    private static final long COOLDOWN_MS      = 180_000L;  // 3 min (real-time)
-
-    // lifesteal
-    private static final double LIFESTEAL_PCT  = 0.36;      // 36%
-    private static final int    HEAL_ON_START  = 10;        // 5 сердечек = 10 HP
-    private static final double EXTRA_MAX_HP   = 20.0;      // +10 сердечек
+    // баланс — читается из ClassRegistry в момент использования (def = прежние значения)
 
     // звуки
     private static final String SND_START_ONCE = "minecraft:entity.wither.spawn";
@@ -74,6 +69,7 @@ public final class VampireListener implements Listener {
         ItemMeta im = it.getItemMeta();
         im.displayName(Component.text("Vampire"));
         im.getPersistentDataContainer().set(KEY_ITEM, PersistentDataType.BYTE, (byte)1);
+        ItemModels.apply(im, "dio_vampire");
         it.setItemMeta(im);
         return it;
     }
@@ -85,6 +81,7 @@ public final class VampireListener implements Listener {
         im.displayName(Component.text("Vampire"));
         // делаем уникальной (чтоб случайно не стакалась с обычными красителями)
         im.getPersistentDataContainer().set(KEY_MASK, PersistentDataType.BYTE, (byte)1);
+        ItemModels.apply(im, "dio_vampire");
         it.setItemMeta(im);
         return it;
     }
@@ -176,14 +173,16 @@ public final class VampireListener implements Listener {
         UUID id = p.getUniqueId();
         // сохранить прежний шлем и макс.хп
         prevHelm.put(id, safeClone(p.getInventory().getHelmet()));
+        double extraMaxHp = org.money.money.meta.ClassRegistry.num("dio", "vampire", "extraMaxHealth", 20.0);
+        double healOnStart = org.money.money.meta.ClassRegistry.num("dio", "vampire", "healOnStart", 10.0);
         AttributeInstance inst = p.getAttribute(Attribute.MAX_HEALTH);
         if (inst != null) {
             prevMax.put(id, inst.getBaseValue());
-            inst.setBaseValue(inst.getBaseValue() + EXTRA_MAX_HP);
+            inst.setBaseValue(inst.getBaseValue() + extraMaxHp);
         }
         // мгновенное лечение на 5 сердечек
         double max = p.getAttribute(Attribute.MAX_HEALTH).getBaseValue();
-        p.setHealth(Math.min(max, p.getHealth() + HEAL_ON_START));
+        p.setHealth(Math.min(max, p.getHealth() + healOnStart));
 
         // надеваем НА ГОЛОВУ наш RED_DYE "Vampire"
         p.getInventory().setHelmet(makeMask());
@@ -191,7 +190,8 @@ public final class VampireListener implements Listener {
         active.add(id);
 
         // окончание формы
-        Bukkit.getScheduler().runTaskLater(plugin, () -> exitForm(p, true), FORM_TICKS);
+        long formTicks = org.money.money.meta.ClassRegistry.numInt("dio", "vampire", "durationTicks", 800);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> exitForm(p, true), formTicks);
     }
 
     private void exitForm(Player p, boolean startCooldown) {
@@ -219,13 +219,14 @@ public final class VampireListener implements Listener {
 
         // кд и возврат предмета
         if (startCooldown) {
-            long backAt = System.currentTimeMillis() + COOLDOWN_MS;
+            long cooldownMs = org.money.money.meta.ClassRegistry.millis("dio", "vampire", 180_000L);
+            long backAt = System.currentTimeMillis() + cooldownMs;
             cooldownUntil.put(id, backAt);
             Bukkit.getAsyncScheduler().runDelayed(plugin, task ->
                     Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
                         Player online = Bukkit.getPlayer(id);
                         if (online != null && online.isOnline()) giveBackDye(online);
-                    }), COOLDOWN_MS, TimeUnit.MILLISECONDS);
+                    }), cooldownMs, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -238,7 +239,8 @@ public final class VampireListener implements Listener {
         if (!(e.getDamager() instanceof Player p)) return;
         if (!(e.getEntity() instanceof Player)) return; // воруем только с игроков
         if (!active.contains(p.getUniqueId())) return;
-        double heal = Math.max(0.0, e.getFinalDamage() * LIFESTEAL_PCT);
+        double lifestealFraction = org.money.money.meta.ClassRegistry.num("dio", "vampire", "lifestealFraction", 0.36);
+        double heal = Math.max(0.0, e.getFinalDamage() * lifestealFraction);
         AttributeInstance inst = p.getAttribute(Attribute.MAX_HEALTH);
         double max = inst != null ? inst.getBaseValue() : 20.0;
         p.setHealth(Math.min(max, p.getHealth() + heal));

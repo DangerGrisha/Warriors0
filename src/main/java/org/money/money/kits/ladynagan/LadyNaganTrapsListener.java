@@ -21,33 +21,36 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
+import org.money.money.meta.ClassRegistry;
 import org.money.money.session.KitSession;
+import org.money.money.util.ItemModels;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Перенос 1:1 из Last_Warriors (events/ladynagan/TrapsListener).
- * Мины из фиолетового бетона «Trap»: невидимый ArmorStand, подрыв по приближению врага
- * (радиус 3), урон 10 в радиусе 3, кд 15с на перезарядку. Детект по display-name.
+ * Мины из фиолетового бетона «Trap»: невидимый ArmorStand, подрыв по приближению ВРАГА.
+ * Владелицу и её тиммейтов мина НЕ детектит (сами они её не активируют), но если мину
+ * подорвал враг — взрыв бьёт ВСЕХ рядом, включая владелицу/тиммейтов, с уроном по дистанции
+ * (центр = полный trap.damage, край радиуса = 0). Радиусы/кд из конфига, кд 15с.
  */
 public class LadyNaganTrapsListener implements Listener {
 
-    // числа 1:1 из LadyConstants
+    // числа 1:1 из LadyConstants (баланс читается из ClassRegistry при использовании)
     private static final Material SET_UP_BLOCK = Material.PURPLE_CONCRETE;
     private static final String   TRAP_NAME = "Trap";
-    private static final double   DETECT_RADIUS = 3;
-    private static final float    EXPLOSION_POWER = 4f;
     private static final boolean  DAMAGE_TERRAIN = false;
-    private static final double   DAMAGE_RADIUS = 3.0;
-    private static final double   DAMAGE_AMOUNT = 10.0;
-    private static final int      COOLDOWN_SECONDS = 15;
     private static final int      TRAPS_SLOT = 6;
 
     private static final String ABILITY_ID = "LadyTrap";
-    private static final int    TIMER_SECONDS = 240;
     private static final double PLACE_SELF_MIN_DIST_SQ = 1.0;
+
+    private static double triggerRadius()  { return ClassRegistry.num("ladynagan", "trap", "triggerRadius", 3.0); }
+    private static float  explosionPower() { return (float) ClassRegistry.num("ladynagan", "trap", "explosionPower", 4.0); }
+    private static double damageRadius()   { return ClassRegistry.num("ladynagan", "trap", "damageRadius", 3.0); }
+    private static double trapDamage()     { return ClassRegistry.num("ladynagan", "trap", "damage", 10.0); }
+    private static int    lifetimeSeconds(){ return ClassRegistry.numInt("ladynagan", "trap", "lifetimeSeconds", 240); }
 
     private final Map<Player, Integer> activeBombCounts = new HashMap<>();
     private final Map<ArmorStand, BukkitRunnable> armorStandTimers = new HashMap<>();
@@ -148,7 +151,7 @@ public class LadyNaganTrapsListener implements Listener {
                 finishMine(owner);
             }
         };
-        timer.runTaskLater(plugin, TIMER_SECONDS * 20L);
+        timer.runTaskLater(plugin, lifetimeSeconds() * 20L);
         armorStandTimers.put(armorStand, timer);
     }
 
@@ -163,7 +166,8 @@ public class LadyNaganTrapsListener implements Listener {
     }
 
     private void startCooldownAndReturn(Player owner) {
-        cooldownManager.startCooldown(owner, ABILITY_ID, TRAPS_SLOT, COOLDOWN_SECONDS, false);
+        int cooldownSeconds = ClassRegistry.seconds("ladynagan", "trap", 15);
+        cooldownManager.startCooldown(owner, ABILITY_ID, TRAPS_SLOT, cooldownSeconds, false);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!KitSession.isInGame(owner)) return; // игра кончилась — не выдаём в лобби
             if (cooldownManager.isCooldownComplete(owner, ABILITY_ID)) {
@@ -172,7 +176,7 @@ public class LadyNaganTrapsListener implements Listener {
                     owner.playSound(owner.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.7f, 1.2f);
                 } catch (Throwable ignored) {}
             }
-        }, COOLDOWN_SECONDS * 20L);
+        }, cooldownSeconds * 20L);
     }
 
     /* ================= interactions / trigger ================= */
@@ -206,13 +210,14 @@ public class LadyNaganTrapsListener implements Listener {
         Player player = event.getPlayer();
         Location playerLoc = player.getLocation();
 
+        double detectRadius = triggerRadius();
         for (ArmorStand as : player.getWorld().getEntitiesByClass(ArmorStand.class)) {
             if (!TRAP_NAME.equals(as.getCustomName())) continue;
-            if (as.getLocation().distanceSquared(playerLoc) > DETECT_RADIUS * DETECT_RADIUS) continue;
+            if (as.getLocation().distanceSquared(playerLoc) > detectRadius * detectRadius) continue;
 
             Player owner = armorStandOwners.get(as);
-            if (owner != null && sameTeam(owner, player)) {
-                continue;
+            if (owner != null && (player.equals(owner) || sameTeam(owner, player))) {
+                continue; // владелица и её тиммейты мину НЕ активируют (в т.ч. в FFA без команды)
             }
             triggerExplosion(as, owner);
         }
@@ -220,18 +225,28 @@ public class LadyNaganTrapsListener implements Listener {
 
     private void triggerExplosion(ArmorStand armorStand, Player owner) {
         Location explosionLoc = armorStand.getLocation();
-        armorStand.getWorld().createExplosion(explosionLoc, EXPLOSION_POWER, false, DAMAGE_TERRAIN);
+        World w = armorStand.getWorld();
+
+        // Сила 0 → ванильный взрыв НЕ наносит AoE-урон и не рушит блоки (иначе задело бы
+        // владелицу/тиммейтов). Звук остаётся; масштабный визуал добавляем частицей.
+        w.createExplosion(explosionLoc, 0, false, DAMAGE_TERRAIN);
+        w.spawnParticle(Particle.EXPLOSION_EMITTER, explosionLoc, Math.max(1, Math.round(explosionPower() / 3f)));
 
         if (owner != null) {
             try { owner.sendMessage(ChatColor.RED + "Your mine was triggered!"); } catch (Throwable ignored) {}
         }
 
-        for (Entity e : armorStand.getNearbyEntities(DAMAGE_RADIUS, DAMAGE_RADIUS, DAMAGE_RADIUS)) {
-            if (e instanceof Player target) {
-                if (owner == null || !sameTeam(owner, target)) {
-                    target.damage(DAMAGE_AMOUNT);
-                }
-            }
+        // Урон по ВСЕМ игрокам в радиусе (включая владелицу и её тиммейтов) со спадом по дистанции.
+        // Своих мина не ДЕТЕКТИТ (не активируется от них, см. onPlayerMove), но раз её подорвал
+        // враг — это обычный взрыв: бьёт всех рядом тем сильнее, чем ближе они к центру.
+        double dmgRadius = damageRadius();
+        for (Entity e : armorStand.getNearbyEntities(dmgRadius, dmgRadius, dmgRadius)) {
+            if (!(e instanceof Player target)) continue;
+            double dist = target.getLocation().distance(explosionLoc);
+            if (dist > dmgRadius) continue;
+            double scaled = trapDamage() * (1.0 - dist / dmgRadius); // линейный спад: центр = полный, край = 0
+            if (scaled <= 0.0) continue;
+            target.damage(scaled); // без источника — чтобы FF-настройки команды не блокировали урон по своим
         }
 
         BukkitRunnable t = armorStandTimers.remove(armorStand);
@@ -258,6 +273,7 @@ public class LadyNaganTrapsListener implements Listener {
         ItemStack dye = new ItemStack(Material.BLUE_DYE);
         ItemMeta im = dye.getItemMeta();
         im.displayName(Component.text("TrapLedy"));
+        ItemModels.apply(im, "ledynagan_mine_gun");
         dye.setItemMeta(im);
         armorStand.getEquipment().setItemInMainHand(dye);
 

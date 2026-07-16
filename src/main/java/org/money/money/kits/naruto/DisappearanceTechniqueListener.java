@@ -25,9 +25,11 @@ import java.util.concurrent.TimeUnit;
 
 public final class DisappearanceTechniqueListener implements Listener {
 
-    private static final long TELEPORT_DELAY_TICKS = 20L * 2; // 2 seconds delay
-    private static final double LOOK_TELEPORT_RANGE = 25.0;
     private static final long RETURN_AFTER_MS = 60_000L; // вернуть предмет через 60 сек
+
+    // баланс — читается из ClassRegistry при использовании (def = прежние значения)
+    private static long   teleportDelayTicks() { return org.money.money.meta.ClassRegistry.numInt("naruto", "disappear", "teleportDelayTicks", 40); }
+    private static double lookTeleportRange()  { return org.money.money.meta.ClassRegistry.num("naruto", "disappear", "range", 25.0); }
 
     private final Plugin plugin;
 
@@ -112,7 +114,7 @@ public final class DisappearanceTechniqueListener implements Listener {
                 dest.getWorld().spawnParticle(Particle.CLOUD, dest.clone().add(0, 0.1, 0), 16, 0.5, 0.3, 0.5, 0.02);
                 dest.getWorld().playSound(dest, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.2f);
             } catch (Throwable ignored) {}
-        }, TELEPORT_DELAY_TICKS).getTaskId();
+        }, teleportDelayTicks()).getTaskId();
 
         pendingTpTaskId.put(playerId, tid);
     }
@@ -122,12 +124,13 @@ public final class DisappearanceTechniqueListener implements Listener {
         Vector dir = eye.getDirection().normalize();
         World w = p.getWorld();
 
-        RayTraceResult hit = w.rayTraceBlocks(eye, dir, LOOK_TELEPORT_RANGE, FluidCollisionMode.NEVER, true);
+        double range = lookTeleportRange();
+        RayTraceResult hit = w.rayTraceBlocks(eye, dir, range, FluidCollisionMode.NEVER, true);
         if (hit != null && hit.getHitPosition() != null) {
             Vector v = hit.getHitPosition();
             return new Location(w, v.getX(), v.getY(), v.getZ());
         }
-        return eye.clone().add(dir.multiply(LOOK_TELEPORT_RANGE));
+        return eye.clone().add(dir.multiply(range));
     }
 
     /* ---------- return item / join ---------- */
