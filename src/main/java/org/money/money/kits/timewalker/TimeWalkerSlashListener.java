@@ -13,9 +13,12 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -78,6 +81,16 @@ public final class TimeWalkerSlashListener implements Listener, KitResettable {
         im.displayName(Component.text("Perfect Sever", NamedTextColor.LIGHT_PURPLE));
         im.getPersistentDataContainer().set(KEY_PERFECT_SEVER, PersistentDataType.BYTE, (byte) 1);
         im.setUnbreakable(true);
+        // Обычный удар мечом: не 8 (дефолт незеритки), а meleeDamage. База руки = 1, поэтому
+        // модификатор урона = melee - 1; скорость атаки держим стандартную мечовую (1.6 = база 4 - 2.4).
+        double melee = ClassRegistry.num("timewalker", "slash", "meleeDamage", 6.5);
+        im.setAttributeModifiers(null);
+        im.addAttributeModifier(Attribute.ATTACK_DAMAGE, new AttributeModifier(
+                new NamespacedKey(plugin, "perfect_sever_dmg"), melee - 1.0,
+                AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
+        im.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
+                new NamespacedKey(plugin, "perfect_sever_spd"), -2.4,
+                AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
         im.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE);
         it.setItemMeta(im);
         return it;

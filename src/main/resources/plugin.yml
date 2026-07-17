@@ -1,6 +1,6 @@
 name: LastWarriors0
 main: org.money.money.Main
-version: 3.1.8
+version: 3.1.9-prerelease
 api-version: 1.21
 softdepend: [Citizens]
 
@@ -15,7 +15,7 @@ commands:
       /kitgive LadyNagan <sniper|ult|fly|trap|explosion> [player]
       /kitgive Saske <katana|shuriken|body|chidori|attraction> [player]
       /kitgive Ishigava <shield|bridge|wall|aura|kunai|clones> [player]
-      /kitgive TimeWalker <run|slash|momentum|ult> [player]
+      /kitgive TimeWalker <run|slash|momentum|ult|rerun> [player]
       /kitgive Blastborn <gloves|grenade|ult|machinegun> [player]
       /kitgive BlueRose <oath|ward|rosebind|petal|heritage|garden> [player]
     aliases: [kg]

@@ -15,6 +15,8 @@ import org.money.money.kits.airwalker.WindInvisListener;
 import org.money.money.kits.airwalker.WindListener;
 import org.money.money.kits.airwalker.WindSwordListener;
 import org.money.money.kits.airwalker.WindUltListener;
+import org.money.money.kits.airwalker.WindTornadoListener;
+import org.money.money.kits.valkyrie.ValkyrieWeaponListener;
 import org.money.money.kits.burgerMaster.GrillPlaceListener;
 import org.money.money.kits.burgerMaster.GardenPlatformListener;
 import org.money.money.kits.burgerMaster.HungryMasterListener;      // <<< NEW
@@ -64,6 +66,7 @@ import org.money.money.kits.timewalker.TimeWalkerRunListener;
 import org.money.money.kits.timewalker.TimeWalkerSlashListener;
 import org.money.money.kits.timewalker.TimeWalkerMomentumListener;
 import org.money.money.kits.timewalker.TimeWalkerUltListener;
+import org.money.money.kits.timewalker.TimeWalkerReRunListener;
 import org.money.money.kits.blastborn.BlastbornManager;
 import org.money.money.kits.blastborn.BlastGlovesListener;
 import org.money.money.kits.blastborn.ImpactGrenadeListener;
@@ -101,6 +104,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     private final WindUltListener windultListener;
     private final WindSwordListener windSwordListener;
     private final WindInvisListener windInvisListener;
+    private final WindTornadoListener windTornadoListener;
     private final SwordShield swordShield;
     private final MaskAbility maskAbility;
     private final OperaTransformationListener operaTransformationListener;
@@ -131,8 +135,10 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     private final TimeWalkerSlashListener timeWalkerSlashListener;
     private final TimeWalkerMomentumListener timeWalkerMomentumListener;
     private final TimeWalkerUltListener timeWalkerUltListener;
+    private final TimeWalkerReRunListener timeWalkerReRunListener;
     private final BlastbornManager blastbornManager;
     private final BlastGlovesListener blastGlovesListener;
+    private final ValkyrieWeaponListener valkyrieListener;
     private final ImpactGrenadeListener blastGrenadeListener;
     private final PhoenixDetonatorListener blastPhoenixListener;
     private final SweatMachineGunListener blastGunListener;
@@ -166,6 +172,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                           WindUltListener windUltListener,
                           WindSwordListener windSwordListener,
                           WindInvisListener windInvisListener,
+                          WindTornadoListener windTornadoListener,
                           SwordShield swordShield,
                           MaskAbility maskAbility,
                           OperaTransformationListener operaTransformationListener,
@@ -196,13 +203,15 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                           TimeWalkerSlashListener timeWalkerSlashListener,
                           TimeWalkerMomentumListener timeWalkerMomentumListener,
                           TimeWalkerUltListener timeWalkerUltListener,
+                          TimeWalkerReRunListener timeWalkerReRunListener,
                           BlastbornManager blastbornManager,
                           BlastGlovesListener blastGlovesListener,
                           ImpactGrenadeListener blastGrenadeListener,
                           PhoenixDetonatorListener blastPhoenixListener,
                           SweatMachineGunListener blastGunListener,
                           IshigavaCloneListener ishiClonesListener,
-                          BlueRoseGuardianManager blueRoseManager) {
+                          BlueRoseGuardianManager blueRoseManager,
+                          ValkyrieWeaponListener valkyrieListener) {
 
         this.plugin = Objects.requireNonNull(plugin);
         this.budListener = Objects.requireNonNull(budListener);
@@ -227,6 +236,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.windultListener   = Objects.requireNonNull(windUltListener);
         this.windSwordListener   = Objects.requireNonNull(windSwordListener);
         this.windInvisListener   = Objects.requireNonNull(windInvisListener);
+        this.windTornadoListener = Objects.requireNonNull(windTornadoListener);
         this.swordShield = Objects.requireNonNull(swordShield);
         this.maskAbility = Objects.requireNonNull(maskAbility);
         this.operaTransformationListener = Objects.requireNonNull(operaTransformationListener);
@@ -257,6 +267,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.timeWalkerSlashListener    = Objects.requireNonNull(timeWalkerSlashListener);
         this.timeWalkerMomentumListener = Objects.requireNonNull(timeWalkerMomentumListener);
         this.timeWalkerUltListener      = Objects.requireNonNull(timeWalkerUltListener);
+        this.timeWalkerReRunListener    = Objects.requireNonNull(timeWalkerReRunListener);
         this.blastbornManager      = Objects.requireNonNull(blastbornManager);
         this.blastGlovesListener   = Objects.requireNonNull(blastGlovesListener);
         this.blastGrenadeListener  = Objects.requireNonNull(blastGrenadeListener);
@@ -264,10 +275,40 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
         this.blastGunListener      = Objects.requireNonNull(blastGunListener);
         this.ishiClonesListener    = Objects.requireNonNull(ishiClonesListener);
         this.blueRoseManager       = Objects.requireNonNull(blueRoseManager);
+        this.valkyrieListener      = Objects.requireNonNull(valkyrieListener);
 
         this.KEY_GANYU_BOW = new NamespacedKey(plugin, "ganyu_bow");
         this.KEY_DIO_HAND  = new NamespacedKey(plugin, "dio_hand");
 
+    }
+
+    /**
+     * Main weapon item for a /kitgive class id — the Valkyrie's arsenal ability grabs a teammate's
+     * weapon through this. Null if the class has no offered weapon.
+     */
+    public ItemStack mainWeaponFor(String classId) {
+        if (classId == null) return null;
+        return switch (classId.toLowerCase(java.util.Locale.ROOT)) {
+            case "ganyu"        -> makeGanyuBow();
+            case "hutao"        -> huTaoInvisListener.makeHoma();
+            case "dio"          -> makeDioHand();
+            case "uraraka"      -> urarakaGloveListener.makeGloveSword();
+            case "naruto"       -> saskeSwordListener.makeKatana();   // Naruto → kitgive Saske sword (по просьбе)
+            case "burgermaster" -> makeBurgerSword();
+            case "airwalker"    -> windSwordListener.makeWindSword();
+            case "haohao"       -> swordShield.makeKingSword();
+            case "opera"        -> operaTransformationListener.makeTransformationDye();
+            case "lightsaber"   -> saberLightExcaliburListener.makeExcalibur();
+            case "darksaber"    -> saberDarkExcaliburListener.makeExcalibur();
+            case "fukuko"       -> fukukoPistolListener.makePistol();
+            case "ladynagan"    -> ladySniperListener.makeSniperStick();
+            case "saske"        -> saskeSwordListener.makeKatana();
+            case "ishigava"     -> ishiKunaiListener.makeKunaiBow();
+            case "timewalker"   -> timeWalkerSlashListener.makePerfectSeverSword();
+            case "blastborn"    -> blastGlovesListener.makeBlastGloves();
+            case "bluerose"     -> blueRoseManager.makeRoseOath();
+            default -> null;
+        };
     }
 
     @Override
@@ -285,7 +326,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Naruto <rasengan|disappear|clones> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry> [player]"); // <<< UPDATED
             sender.sendMessage(ChatColor.GRAY + " /" + label + " BurgerMaster <grill|garden|hungry|sword> [player]");
-            sender.sendMessage(ChatColor.GRAY + " /" + label + " AirWalker <wind|windult|windsword|windinvis> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " AirWalker <wind|windult|windsword|windinvis|tornado> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " HaoHao <swordshield> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " HaoHao <mask> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Opera <transformation> [player]");
@@ -297,7 +338,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.GRAY + " /" + label + " LadyNagan <sniper|ult|fly|trap|explosion> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Saske <katana|shuriken|body|chidori|attraction> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Ishigava <shield|bridge|wall|aura|kunai|clones> [player]");
-            sender.sendMessage(ChatColor.GRAY + " /" + label + " TimeWalker <run|slash|momentum|ult> [player]");
+            sender.sendMessage(ChatColor.GRAY + " /" + label + " TimeWalker <run|slash|momentum|ult|rerun> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " Blastborn <gloves|grenade|ult|machinegun> [player]");
             sender.sendMessage(ChatColor.GRAY + " /" + label + " BlueRose <oath|ward|rosebind|petal|heritage|garden|storm> [player]");
             return true;
@@ -428,6 +469,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                         itemToGive = windInvisListener.makeInvisDye();
                         pretty = "Invis";
                     }
+                    case "tornado", "twister", "storm" -> { itemToGive = windTornadoListener.makeTornadoDye(); pretty = "Tornado"; }
                     default -> {
                         sender.sendMessage(ChatColor.RED + "Неизвестный предмет для AirWalker: " + sub);
                         sender.sendMessage(ChatColor.GRAY + "Доступно: wind");
@@ -594,6 +636,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                     case "slash", "sever", "sword" -> { itemToGive = timeWalkerSlashListener.makePerfectSeverSword(); pretty = "Perfect Sever"; }
                     case "momentum", "drive", "perk" -> { itemToGive = timeWalkerMomentumListener.makeMomentumItem(); pretty = "Momentum Drive"; }
                     case "ult", "mirage", "chrono" -> { itemToGive = timeWalkerUltListener.makeChronoMirageItem();    pretty = "Chrono Mirage"; }
+                    case "rerun", "goback", "reset" -> { itemToGive = timeWalkerReRunListener.makeReRunItem();        pretty = "ReRun"; }
                     default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для TimeWalker: " + sub); return true; }
                 }
             }
@@ -621,7 +664,12 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
                 blueRoseManager.markGuardian(target);
             }
 
-
+            case "valkyrie", "valk", "valkirie" -> {
+                switch (sub) {
+                    case "arsenal", "weapon", "weapons", "menu", "choose" -> { itemToGive = valkyrieListener.makeSelector(); pretty = "Valkyrie's Arsenal"; }
+                    default -> { sender.sendMessage(ChatColor.RED + "Неизвестный предмет для Valkyrie: " + sub); return true; }
+                }
+            }
 
             default -> { sender.sendMessage(ChatColor.RED + "Неизвестный герой: " + args[0]); return true; }
         }
@@ -682,7 +730,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (!sender.hasPermission("kits.give")) return List.of();
 
-        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker","HaoHao","LightSaber","DarkSaber","Fukuko","LadyNagan","Saske","Ishigava","TimeWalker","Blastborn","BlueRose"), args[0]);
+        if (args.length == 1) return filter(List.of("Ganyu","HuTao","Dio","Uraraka","Naruto","BurgerMaster","AirWalker","HaoHao","LightSaber","DarkSaber","Fukuko","LadyNagan","Saske","Ishigava","TimeWalker","Blastborn","BlueRose","Valkyrie"), args[0]);
         if (args.length == 2) {
             if ("ganyu".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("bow","bud","ult","meteor"), args[1]);
             if ("hutao".equalsIgnoreCase(args[0]))   return filter(Arrays.asList("homa","pyro","ult"), args[1]);
@@ -707,7 +755,7 @@ public final class KitGiveCommand implements CommandExecutor, TabCompleter {
             if ("ishigava".equalsIgnoreCase(args[0]) || "ishigawa".equalsIgnoreCase(args[0]) || "ishi".equalsIgnoreCase(args[0]))
                 return filter(Arrays.asList("shield","bridge","wall","aura","kunai","clones"), args[1]);
             if ("timewalker".equalsIgnoreCase(args[0]) || "tw".equalsIgnoreCase(args[0]) || "time".equalsIgnoreCase(args[0]))
-                return filter(Arrays.asList("run","slash","momentum","ult"), args[1]);
+                return filter(Arrays.asList("run","slash","momentum","ult","rerun"), args[1]);
             if ("blastborn".equalsIgnoreCase(args[0]) || "blast".equalsIgnoreCase(args[0]))
                 return filter(Arrays.asList("gloves","grenade","ult","machinegun"), args[1]);
             if ("bluerose".equalsIgnoreCase(args[0]) || "blueroseguardian".equalsIgnoreCase(args[0])

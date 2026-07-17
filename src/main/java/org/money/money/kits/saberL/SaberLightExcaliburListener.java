@@ -66,6 +66,10 @@ public final class SaberLightExcaliburListener implements Listener {
     // Direction check for frontal blocking
     private static final double FRONT_BLOCK_DOT = 0.15; // >0 means attack roughly from front hemisphere
 
+    // F (swap-hands) dash: quick forward lunge with its own cooldown.
+    private static double dashPower() { return org.money.money.meta.ClassRegistry.num("saberlight", "excalibur", "dashPower", 1.4); }
+    private static int dashCooldownSeconds() { return org.money.money.meta.ClassRegistry.numInt("saberlight", "excalibur", "dashCooldownSeconds", 7); }
+
     private final Plugin plugin;
 
     /* =========================
@@ -96,6 +100,9 @@ public final class SaberLightExcaliburListener implements Listener {
 
     // Player -> банк душ, переживающий смерть→респавн (души не теряются — копятся в мече).
     private final Map<UUID, Integer> soulBank = new ConcurrentHashMap<>();
+
+    // Player -> last F-dash time (ms), for the dash cooldown.
+    private final Map<UUID, Long> dashCdMap = new ConcurrentHashMap<>();
 
     public SaberLightExcaliburListener(Plugin plugin) {
         this.plugin = Objects.requireNonNull(plugin);
@@ -613,6 +620,44 @@ public final class SaberLightExcaliburListener implements Listener {
             if (isExcalibur(main)) showGuardBar(p);
             else hideGuardBar(p);
         });
+    }
+
+    /** F while holding Excalibur = forward dash (own cooldown). Cancels the vanilla hand-swap. */
+    @EventHandler(ignoreCancelled = false, priority = EventPriority.HIGHEST)
+    public void onSwapDash(PlayerSwapHandItemsEvent e) {
+        Player p = e.getPlayer();
+        if (!isExcalibur(p.getInventory().getItemInMainHand())) return;
+        e.setCancelled(true); // F is the dash — don't shuffle the shield into the off-hand
+
+        UUID id = p.getUniqueId();
+        long now = System.currentTimeMillis();
+        long cdMs = Math.max(0, dashCooldownSeconds()) * 1000L;
+        Long last = dashCdMap.get(id);
+        if (last != null && now - last < cdMs) {
+            long secLeft = (cdMs - (now - last) + 999) / 1000;
+            p.sendActionBar(Component.text("Dash: " + secLeft + "s"));
+            p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.4f, 0.8f);
+            return;
+        }
+        dashCdMap.put(id, now);
+        dash(p);
+    }
+
+    private void dash(Player p) {
+        org.bukkit.util.Vector look = p.getEyeLocation().getDirection();
+        org.bukkit.util.Vector flat = new org.bukkit.util.Vector(look.getX(), 0, look.getZ());
+        if (flat.lengthSquared() < 1e-6) flat = new org.bukkit.util.Vector(0, 0, 1);
+        flat.normalize().multiply(Math.max(0.2, dashPower()));
+        flat.setY(0.3); // small hop so it doesn't grind the floor
+        p.setVelocity(flat);
+
+        World w = p.getWorld();
+        Location at = p.getLocation().add(0, 0.4, 0);
+        w.playSound(p.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1.0f, 1.5f);
+        w.playSound(p.getLocation(), Sound.ITEM_TRIDENT_RIPTIDE_1, 0.9f, 1.6f);
+        w.spawnParticle(Particle.END_ROD, at, 18, 0.2, 0.15, 0.2, 0.03);
+        w.spawnParticle(Particle.CLOUD, at, 12, 0.2, 0.1, 0.2, 0.02);
+        w.spawnParticle(Particle.SWEEP_ATTACK, at.clone().add(0, 0.6, 0), 1, 0, 0, 0, 0);
     }
 
     /* =========================

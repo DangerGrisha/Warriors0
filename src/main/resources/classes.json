@@ -23,6 +23,7 @@
             "wallRadius": 3.0,
             "wallDamage": 0.0,
             "wallKnockback": 1.2,
+            "wallSelfDestructionMultiplier": 2.0,
             "airDistance": 3.0,
             "airRadius": 3.2,
             "airDamage": 6.0,
@@ -35,12 +36,14 @@
           "name": "Impact Grenade",
           "cooldownTicks": 600,
           "description": [
-            "Бросает гранату, взрывающуюся от удара.",
-            "Сильный урон по площади и отброс врагов."
+            "Бросает гранату: летит, отскакивает от поверхности и",
+            "взрывается через 1с после первого касания. Урон по площади + отброс."
           ],
           "params": {
             "primeTicks": 20,
             "projectileSpeed": 1.9,
+            "fuseTicks": 20,
+            "bounceDamping": 0.45,
             "explosionRadius": 4.0,
             "blockBreakRadius": 3.0,
             "damage": 12.0,
@@ -102,7 +105,7 @@
             "overloadDelayTicks": 20,
             "overloadExplosionRadius": 5.5,
             "overloadBlockBreakRadius": 4.0,
-            "overloadDamage": 28.0,
+            "overloadDamage": 18.67,
             "overloadKnockback": 2.0,
             "overloadTotemDamageMultiplier": 0.5,
             "selfKnockbackMultiplier": 2.25
@@ -128,7 +131,10 @@
           "params": {
             "dashTicks": 20,
             "totalTicks": 160,
-            "speedLevel": 60
+            "speedLevel": 60,
+            "echoDelaySeconds": 5.0,
+            "futureKnockback": 0.45,
+            "maxRecordedHits": 300
           }
         },
         {
@@ -143,6 +149,7 @@
             "iframeTicks": 8,
             "forwardLaunch": 0.6,
             "rangeBlocks": 6.0,
+            "meleeDamage": 6.5,
             "baseDamage": 5.0,
             "speedMultiplier": 13.5,
             "minDamage": 5.0,
@@ -187,6 +194,19 @@
             "cloneCount": 6,
             "selfSpeedAmplifier": 1,
             "selfResistanceAmplifier": 0
+          }
+        },
+        {
+          "key": "rerun",
+          "name": "ReRun",
+          "cooldownTicks": 900,
+          "description": [
+            "Раздваивает время: сохраняет позицию, HP и нанесённый урон на 20с (предмет → GoBack).",
+            "GoBack — откат: телепорт назад, её HP и HP тех, кому она нанесла урон, возвращаются.",
+            "Смерть в течение 20с откатывает автоматически; иначе всё остаётся как есть, способность в КД."
+          ],
+          "params": {
+            "windowTicks": 400
           }
         }
       ]
@@ -941,7 +961,9 @@
             "movementPenaltyPerSoul": 0.0015,
             "guardBreakThreshold": 12.0,
             "guardBreakDurationTicks": 100,
-            "blockPercent": 0.8
+            "blockPercent": 0.8,
+            "dashPower": 1.4,
+            "dashCooldownSeconds": 7
           }
         },
         {
@@ -1006,7 +1028,9 @@
             "movementPenaltyPerSoul": 0.0015,
             "guardBreakThreshold": 12.0,
             "guardBreakDurationTicks": 100,
-            "blockPercent": 0.8
+            "blockPercent": 0.8,
+            "dashPower": 1.4,
+            "dashCooldownSeconds": 7
           }
         },
         {
@@ -1041,7 +1065,7 @@
       "displayName": "AirWalker",
       "type": "Skirmisher",
       "rarity": "EPIC",
-      "ceiling": 4,
+      "ceiling": 5,
       "abilities": [
         {
           "key": "wind",
@@ -1102,6 +1126,49 @@
             "durationTicks": 600,
             "slowFallStrongAmplifier": 15,
             "slowFallWeakAmplifier": 5
+          }
+        },
+        {
+          "key": "tornado",
+          "name": "Tornado",
+          "cooldownTicks": 440,
+          "description": [
+            "ПКМ — призывает торнадо, медленно идущее вперёд.",
+            "Засасывает врагов, крутит и поднимает; в конце подбрасывает вверх."
+          ],
+          "params": {
+            "durationTicks": 140,
+            "moveSpeed": 0.12,
+            "radius": 4.5,
+            "height": 8.0,
+            "pullStrength": 0.5,
+            "spinStrength": 0.9,
+            "liftStrength": 0.35,
+            "damagePerTick": 1.0,
+            "damageIntervalTicks": 12,
+            "finaleLaunch": 1.45,
+            "spawnAhead": 3.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "valkyrie",
+      "displayName": "Valkyrie",
+      "type": "Support",
+      "rarity": "LEGENDARY",
+      "ceiling": 4,
+      "abilities": [
+        {
+          "key": "arsenal",
+          "name": "Teammate Arsenal",
+          "cooldownTicks": 0,
+          "description": [
+            "ПКМ — меню главного оружия союзников (по их классам).",
+            "Выбери одно; сменить оружие можно раз в минуту."
+          ],
+          "params": {
+            "changeCooldownSeconds": 60
           }
         }
       ]

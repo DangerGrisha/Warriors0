@@ -8,6 +8,8 @@ import org.money.money.kits.airwalker.WindInvisListener;
 import org.money.money.kits.airwalker.WindListener;
 import org.money.money.kits.airwalker.WindSwordListener;
 import org.money.money.kits.airwalker.WindUltListener;
+import org.money.money.kits.airwalker.WindTornadoListener;
+import org.money.money.kits.valkyrie.ValkyrieWeaponListener;
 import org.money.money.kits.burgerMaster.GardenPlatformListener;
 import org.money.money.kits.burgerMaster.GrillManager;
 import org.money.money.kits.burgerMaster.GrillPlaceListener;
@@ -65,6 +67,7 @@ import org.money.money.kits.timewalker.TimeWalkerRunListener;
 import org.money.money.kits.timewalker.TimeWalkerSlashListener;
 import org.money.money.kits.timewalker.TimeWalkerMomentumListener;
 import org.money.money.kits.timewalker.TimeWalkerUltListener;
+import org.money.money.kits.timewalker.TimeWalkerReRunListener;
 import org.money.money.kits.blastborn.BlastbornManager;
 import org.money.money.kits.blastborn.BlastGlovesListener;
 import org.money.money.kits.blastborn.ImpactGrenadeListener;
@@ -128,6 +131,8 @@ public final class Main extends JavaPlugin {
         var windult = new WindUltListener(this);
         var windsword = new WindSwordListener(this);
         var windinvis = new WindInvisListener(this);
+        var windTornado = new WindTornadoListener(this);
+        var valkyrie = new ValkyrieWeaponListener(this);
         var haoh = new SwordShield(this);
         var mask = new MaskAbility(this);
         var haoPerk = new HaoHaoPerkListener(this);
@@ -164,6 +169,7 @@ public final class Main extends JavaPlugin {
         var twSlash        = new TimeWalkerSlashListener(this);
         var twMomentum     = new TimeWalkerMomentumListener(this);
         var twUlt          = new TimeWalkerUltListener(this);
+        var twRerun        = new TimeWalkerReRunListener(this);
         this.timeWalkerMomentum = twMomentum;
         this.timeWalkerUlt = twUlt;
         var blastMgr       = new BlastbornManager(this);
@@ -211,6 +217,8 @@ public final class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(windult, this);
         getServer().getPluginManager().registerEvents(windsword, this);
         getServer().getPluginManager().registerEvents(windinvis, this);
+        getServer().getPluginManager().registerEvents(windTornado, this);
+        getServer().getPluginManager().registerEvents(valkyrie, this);
         getServer().getPluginManager().registerEvents(haoh, this);
         getServer().getPluginManager().registerEvents(mask, this);
         getServer().getPluginManager().registerEvents(haoPerk, this);
@@ -241,6 +249,7 @@ public final class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(twSlash,      this);
         getServer().getPluginManager().registerEvents(twMomentum,   this);
         getServer().getPluginManager().registerEvents(twUlt,        this);
+        getServer().getPluginManager().registerEvents(twRerun,      this);
         getServer().getPluginManager().registerEvents(blastMgr,     this);
         getServer().getPluginManager().registerEvents(blastGloves,  this);
         getServer().getPluginManager().registerEvents(blastGren,    this);
@@ -255,17 +264,19 @@ public final class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(brgStorm,     this);
 
         var kit = new KitGiveCommand(this, bud, ult, meteor, homa, pyro, boom, timestop, vampire, glove, gravity, post,
-                levitationMark, rassengan, randomtp, clones, grill, garden, hungry, wind, windult, windsword, windinvis,
+                levitationMark, rassengan, randomtp, clones, grill, garden, hungry, wind, windult, windsword, windinvis, windTornado,
                 haoh, mask, opera, operaAura, saberlightexcalibur, saberlightrealese, saberdarkexcalibur, saberdarkrelease,
                 fukukoPistol, fukukoMortira, fukukoBombZone, fukukoShock,
                 ladySniper, ladyFly, ladyTraps, ladyExplosion,
                 saskeSword, saskeShuriken, saskeBody, saskeChidori, saskeAttraction,
                 ishiShield, ishiBridges, ishiWall, ishiAura, ishiKunai,
-                twRun, twSlash, twMomentum, twUlt,
+                twRun, twSlash, twMomentum, twUlt, twRerun,
                 blastMgr, blastGloves, blastGren, blastPhx, blastGun,
-                ishiClones, brgMgr);
+                ishiClones, brgMgr, valkyrie);
         getCommand("kitgive").setExecutor(kit);
         getCommand("kitgive").setTabCompleter(kit);
+        // Valkyrie pulls teammate weapons through the give command's factory (breaks the ctor cycle).
+        valkyrie.setWeaponSource(kit::mainWeaponFor);
 
         //Saber Light
 
@@ -319,10 +330,13 @@ public final class Main extends JavaPlugin {
         resettables.add(homa);
         resettables.add(tradesListener);
         if (this.dio != null) resettables.add(this.dio);
+        resettables.add(windTornado);
+        resettables.add(valkyrie);
         resettables.add(twRun);
         resettables.add(twSlash);
         resettables.add(twMomentum);
         resettables.add(twUlt);
+        resettables.add(twRerun);
         resettables.add(blastMgr);
         resettables.add(blastGloves);
         resettables.add(blastGren);

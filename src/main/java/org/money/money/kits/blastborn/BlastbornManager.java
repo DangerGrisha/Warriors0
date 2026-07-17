@@ -152,10 +152,18 @@ public final class BlastbornManager implements Listener, KitResettable {
         }
     }
 
-    public void addGloveGain(Player p) {
+    public void addGloveGain(Player p) { addGloveGain(p, 1.0); }
+
+    /** Glove blast meter gain scaled by {@code multiplier} (e.g. Wall Blast charges 2× as fast).
+     *  A Valkyrie wielding stolen Blast Gloves (tag {@code ValkyrieBlast}) charges an extra 2× — her
+     *  borrowed gloves overload twice as fast as a real Bakugo's. */
+    public void addGloveGain(Player p, double multiplier) {
         if (p == null) return;
         if (isUltActive(p)) return; // glove blasts don't build the meter during the ult
-        addPoints(p, ClassRegistry.numInt("blastborn", "selfdestruction", "gainPerGloveExplosion", 10));
+        double mult = Math.max(0.0, multiplier);
+        if (p.getScoreboardTags().contains("ValkyrieBlast")) mult *= 2.0;
+        int base = ClassRegistry.numInt("blastborn", "selfdestruction", "gainPerGloveExplosion", 10);
+        addPoints(p, (int) Math.round(base * mult));
     }
 
     public int getPoints(Player p) {
@@ -252,7 +260,7 @@ public final class BlastbornManager implements Listener, KitResettable {
         // Balance numbers read at use time so /warriors reload applies without restart.
         final double overloadExplosionRadius = ClassRegistry.num("blastborn", "selfdestruction", "overloadExplosionRadius", 5.5);
         final double overloadBlockBreakRadius = ClassRegistry.num("blastborn", "selfdestruction", "overloadBlockBreakRadius", 4.0);
-        final double overloadDamage = ClassRegistry.num("blastborn", "selfdestruction", "overloadDamage", 28.0);
+        final double overloadDamage = ClassRegistry.num("blastborn", "selfdestruction", "overloadDamage", 18.67);
         final double overloadKnockback = ClassRegistry.num("blastborn", "selfdestruction", "overloadKnockback", 2.0);
         final double selfKnockbackMultiplier = ClassRegistry.num("blastborn", "selfdestruction", "selfKnockbackMultiplier", 2.25);
         final double overloadTotemDamageMultiplier = ClassRegistry.num("blastborn", "selfdestruction", "overloadTotemDamageMultiplier", 0.5);

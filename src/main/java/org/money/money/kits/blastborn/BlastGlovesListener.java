@@ -215,7 +215,11 @@ public final class BlastGlovesListener implements Listener, KitResettable {
         // don't re-add a stale cooldown / meter gain for a just-dead player.
         if (!p.isOnline() || p.isDead()) return;
 
-        manager.addGloveGain(p);
+        // Wall Blast is "more expensive" on the Self-Destruction meter than Air Burst.
+        double gainMult = (mode == MODE_WALL)
+                ? ClassRegistry.num("blastborn", "gloves", "wallSelfDestructionMultiplier", 2.0)
+                : 1.0;
+        manager.addGloveGain(p, gainMult);
 
         cooldownMap.put(id, now);
         if (cooldownTicks > 0) {
